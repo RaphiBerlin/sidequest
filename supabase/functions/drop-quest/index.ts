@@ -1,0 +1,69 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+Deno.serve(async () => {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  // 1. Pick a random quest
+  const { data: quests, error: questsError } = await supabase
+    .from("quests")
+    .select("id")
+    .limit(1)
+    .order("id", { ascending: false }) // stable enough order for offset trick
+    .throwOnError();
+
+  // Use a random offset against the full table count
+  const { count } = await supabase
+    .from("quests")
+    .select("*", { count: "exact", head: true })
+    .throwOnError();
+
+  const randomOffset = Math.floor(Math.random() * (count ?? 1));
+
+  const { data: picked, error: pickError } = await supabase
+    .from("quests")
+    .select("id")
+    .range(randomOffset, randomOffset)
+    .single();
+
+  if (pickError || !picked) {
+    return Response.json(
+      { success: false, error: pickError?.message ?? "No quests found" },
+      { status: 500 },
+    );
+  }
+
+  // 2. Clear the existing active quest (table holds at most one row)
+  const { error: deleteError } = await supabase
+    .from("active_quest")
+    .delete()
+    .neq("quest_id", "00000000-0000-0000-0000-000000000000"); // matches all rows
+
+  if (deleteError) {
+    return Response.json(
+      { success: false, error: deleteError.message },
+      { status: 500 },
+    );
+  }
+
+  // 3. Insert the new active quest
+  const { error: insertError } = await supabase
+    .from("active_quest")
+    .insert({
+      quest_id: picked.id,
+      dropped_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+    });
+
+  if (insertError) {
+    return Response.json(
+      { success: false, error: insertError.message },
+      { status: 500 },
+    );
+  }
+
+  // 4. Return confirmation
+  return Response.json({ success: true, quest_id: picked.id });
+});

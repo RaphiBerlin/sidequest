@@ -1,0 +1,395 @@
+{
+  "project": "sidequest",
+  "lastUpdated": "2026-05-07T00:00:00Z",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Create Supabase project & run schema migration",
+      "who": "Friend",
+      "status": "skipped",
+      "notes": "Manual step — friend does in Supabase dashboard"
+    },
+    {
+      "id": 2,
+      "title": "Scaffold React + Vite app with Supabase + Tailwind",
+      "who": "Claude",
+      "status": "completed",
+      "notes": "Done — src/main.jsx, src/lib/supabase.js, tailwind.config.js, index.css"
+    },
+    {
+      "id": 3,
+      "title": "Deploy to Vercel + connect GitHub",
+      "who": "Friend",
+      "status": "skipped",
+      "notes": "Manual step — friend does in Vercel dashboard"
+    },
+    {
+      "id": 4,
+      "title": "Magic link auth — sign in flow",
+      "who": "Claude",
+      "status": "completed",
+      "notes": "Done — src/screens/Login.jsx, src/screens/AuthCallback.jsx"
+    },
+    {
+      "id": 5,
+      "title": "Auth session persistence + protected routes",
+      "who": "Claude",
+      "status": "completed",
+      "notes": "Done — src/hooks/useAuth.js, src/components/ProtectedRoute.jsx"
+    },
+    {
+      "id": 6,
+      "title": "Onboarding — name + profile creation",
+      "who": "Claude",
+      "status": "completed",
+      "notes": "Done — src/screens/Onboarding.jsx, AuthCallback checks users table"
+    },
+    {
+      "id": 7,
+      "title": "PWA manifest + install prompt",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — vite-plugin-pwa installed; vite.config.js updated with VitePWA plugin (name, short_name, theme_color, background_color, display standalone, start_url, icon refs); public/manifest.json fallback manifest; public/icons/icon.svg (dark circle with S/Q rust text, Fraunces italic); src/components/InstallBanner.jsx (beforeinstallprompt for Android/Chrome, iOS Safari share prompt detection, localStorage dismiss); InstallBanner rendered in src/main.jsx inside BrowserRouter; build generates dist/sw.js + dist/workbox-*.js service worker via generateSW mode"
+    },
+    {
+      "id": 8,
+      "title": "Seed the quest pool — 25 quests in the database",
+      "who": "Claude",
+      "status": "completed",
+      "notes": "Done — quests_seed.sql"
+    },
+    {
+      "id": 9,
+      "title": "Quest drop Edge Function (cron job)",
+      "who": "Claude",
+      "status": "completed",
+      "notes": "Done — supabase/functions/drop-quest/index.ts + config.toml"
+    },
+    {
+      "id": 10,
+      "title": "Supabase Realtime — quest drop listener",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/hooks/useQuestDrop.js (fetches current active quest on mount via joined query, subscribes to postgres_changes INSERT on active_quest table, fetches full quest details on new drop, cleans up channel on unmount); supabase/realtime-setup.sql (ALTER TABLE REPLICA IDENTITY FULL + replication enable instructions)"
+    },
+    {
+      "id": 11,
+      "title": "Row Level Security policies",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Written to supabase/rls-policies.sql — run in Supabase SQL Editor"
+    },
+    {
+      "id": 12,
+      "title": "Photo storage bucket setup",
+      "who": "Friend",
+      "status": "skipped",
+      "notes": "Manual step — friend does in Supabase dashboard"
+    },
+    {
+      "id": 13,
+      "title": "Presence table — write + delete location",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/lib/location.js (writePresence uses navigator.geolocation.getCurrentPosition with high accuracy, upserts lat/lng + updated_at to presence table, maps GeolocationPositionError codes to readable messages; deletePresence removes row on quest end); src/hooks/useLocation.js (useLocation hook exposes location state, locationError, locationLoading, and requestLocation; cleans up presence row via useEffect cleanup on unmount via didWriteRef guard)"
+    },
+    {
+      "id": 14,
+      "title": "Proximity query — find nearby friends",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "SQL function written to supabase/proximity-function.sql; getNearbyUsers in src/lib/proximity.js"
+    },
+    {
+      "id": 15,
+      "title": "Home screen — full UI",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Home.jsx fully rewritten with: top bar (side/quest logo + avatar button navigating to /settings), location pill (green when active, triggers requestLocation when tapped), quest state center area (spinner while loading, active quest with resume button or idle state with simulate-drop button), streak badge with freeze-ready pill, recent memories horizontal scroll strip with photo thumbnails; index.html Google Fonts URL updated to include JetBrains Mono (wght 400;500) and Bricolage Grotesque (wght 400;500) alongside Fraunces; build passes cleanly"
+    },
+    {
+      "id": 16,
+      "title": "Quest drop screen",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "QuestDrop screen created at src/screens/QuestDrop.jsx; /quest-drop route added to main.jsx with ProtectedRoute; build succeeded cleanly."
+    },
+    {
+      "id": 17,
+      "title": "Nearby map screen — UI",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Nearby.jsx (location gate with Enable location CTA + go solo fallback; 280px map canvas with grid background, dashed radius ring, friend pins coloured by tier, animated rust ping for current position; legend with tier colour dots + last-updated counter; scrollable nearby list with AvatarCircle, tier label, distance in ft, toggle selection; floating rust bar shows count + START QUEST when party selected; auto-refreshes every 30s via setInterval; navigates to /active-quest with party state); /nearby route added to src/main.jsx behind ProtectedRoute; build passed"
+    },
+    {
+      "id": 18,
+      "title": "Active quest screen — layout and timer",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/ActiveQuest.jsx: reads activeQuest + party from router state; countdown timer (setInterval, 1s tick) reads expires_at, formats MM:SS, color shifts rust→orange→red under 15min/5min, adds CSS shake animation under 5min, alerts and navigates /home on expiry; localStorage keys sq_session_started_at and sq_session_id for refresh safety; Supabase INSERT into quest_sessions (quest_id, user_id, party_ids, started_at) skipped if session id already in localStorage; back arrow shows window.confirm abandon dialog; ▲ QUEST IN PROGRESS gold monospace label; large italic Fraunces quest title; semi-opaque description; PartyRow with overlapping avatar circles (color-hashed initials, z-stacked with negative margin) + PARTY OF X / GOING SOLO label; camera placeholder frame (flex-1, min 280px, dark rounded rect, icon + 'Tap to enable camera' + Enable Camera button); shutter row (FLIP label | 64px white circle shutter | SKIP→/home); gold color token added to tailwind.config.js; shake keyframe + animation added to tailwind config; /active-quest route added to src/main.jsx behind ProtectedRoute; build passed (89 modules, 409 kB)"
+    },
+    {
+      "id": 19,
+      "title": "Camera — single capture with flash",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/ActiveQuest.jsx updated with full camera capture: enableCamera calls getUserMedia({ video: { facingMode }, audio: false }), stores stream in streamRef, attaches to <video autoPlay playsInline muted> covering camera frame; flipCamera stops all tracks and restarts stream with toggled facingMode ('user'/'environment'); front-camera video has CSS transform scaleX(-1) applied; shutter capturePhoto draws video frame to hidden <canvas> (with mirrored ctx.translate+scale for selfie mode), triggers flash overlay (opacity 1→0 after 80ms via flashVisible state), calls canvas.toBlob at 0.75 quality JPEG, stores object URL in capturedPhoto state for preview image overlay, then after 1200ms calls completeQuest(blob); completeQuest reads sq_session_started_at and sq_session_id from localStorage, calculates elapsedSec, navigates to /memory with { mainPhoto: blob, pipPhoto: null, sessionId, quest, party, elapsedSec }; SKIP calls completeQuest(null); useEffect cleanup stops all stream tracks on unmount; shutter + FLIP buttons disabled (opacity/cursor) when camera not enabled or photo already captured; build passed (89 modules, 412 kB)"
+    },
+    {
+      "id": 20,
+      "title": "Dual camera (BeReal-style PiP)",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/ActiveQuest.jsx upgraded with BeReal-style dual capture: dualMode boolean state + pipStreamRef/pipVideoRef/pipCanvasRef refs added; DUAL toggle button (absolute top-left of camera frame, z-30, dark/60 bg when OFF, rust when ON, shifts right when PiP visible to avoid overlap) only shown when cameraEnabled; iOS detection via /iPhone|iPad|iPod/i.test(navigator.userAgent) — shows alert and aborts if on iOS; toggleDualMode requests second getUserMedia({ video: { facingMode: 'user' }, audio: false }) on enable, stops all PiP tracks on disable; PiP overlay div (100×140px, absolute top-left, 2px white border, 8px border-radius, overflow hidden, z-20) contains <video autoPlay playsInline muted style scaleX(-1)> attached to pipVideoRef; dual capture in capturePhoto draws both canvases (main canvas existing logic, pipCanvasRef 300×420 with mirrored draw ctx.translate(300,0)+ctx.scale(-1,1)), converts both to blobs via Promise.all, calls completeQuest(mainBlob, pipBlob); completeQuest(mainPhoto, pipPhoto=null) now accepts second arg and passes both in router state to /memory; unmount cleanup stops tracks on both streamRef.current and pipStreamRef.current; build passed (89 modules, 414 kB JS)"
+    },
+    {
+      "id": 21,
+      "title": "Photo upload to Supabase Storage",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07",
+      "notes": "src/lib/photos.js with uploadPhoto (with retry) and completeSession; supabase/pip-photo-url.sql adds pip_photo_url column"
+    },
+    {
+      "id": 22,
+      "title": "Memory card screen",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Memory.jsx: uploads main+pip blobs via completeSession on mount, shows shimmer skeleton while uploading, renders memory card with photo area (main image + PiP overlay + timestamp badge), quest stats row (TIME/PARTY/STREAK), new-connection cards for fof/open tier party members with Add Friend button, emoji reaction bar with toggle+count backed by Supabase reactions table, Save card (canvas PNG download) and Done buttons; /memory ProtectedRoute added to src/main.jsx; build passes cleanly (87 modules, 399 kB JS)"
+    },
+    {
+      "id": 23,
+      "title": "Quest journal screen",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Journal.jsx with: stats row (total quests, streak days, unique crew count pulled from users table); skeleton loading cards (3 pulse placeholders); empty state with italic Fraunces copy and rust-bordered CTA; session list (last 50 completed, ordered newest-first) with 64px photo thumbnail or ◐ placeholder, quest title, date+time, party size; accordion expand shows full-resolution photo, quest description, and elapsed time formatted as MM:SS; /journal route added to src/main.jsx behind ProtectedRoute; build succeeded cleanly"
+    },
+    {
+      "id": 24,
+      "title": "Streak system — tracking, freeze, reset",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07",
+      "notes": "src/lib/streak.js (updateStreak, checkAndResetStreak, useFreeze); supabase/streak-columns.sql adds streak, last_quest_date, last_freeze_used_at to users table"
+    },
+    {
+      "id": 25,
+      "title": "Timeout handling + streak reset modal",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/components/TimeoutModal.jsx (full-screen overlay with backdrop blur, cream card, rust ⏰ icon, Fraunces italic title switches on trigger='timeout'/'missed', Bricolage body text, conditional freeze line, stacked buttons: 'Use streak freeze 🧊' in rust + 'Back to home' with border); src/context/AppState.jsx (global context with currentQuestSession, streak, freezeAvailable, showTimeoutModal, timeoutTrigger; functions setCurrentQuestSession, resetQuest clears localStorage sq_session_id + sq_session_started_at, setStreak, setFreezeAvailable, showTimeout, hideTimeout; AppStateProvider renders TimeoutModal, onUseFreeze calls useFreeze(user.id) then hideTimeout, onClose calls resetQuest+hideTimeout+navigate('/home')); src/main.jsx updated to wrap inner content with <AppStateProvider> inside <BrowserRouter>; src/screens/ActiveQuest.jsx updated to import useAppState, replace alert+navigate on timer expiry with showTimeout('timeout'); build passed cleanly (92 modules, 416 kB JS)"
+    },
+    {
+      "id": 26,
+      "title": "Tab bar navigation",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/components/TabBar.jsx: fixed bottom nav bar with dark bg at 97% opacity, backdrop-blur-sm, border-t border-paper/10, safe-area-inset-bottom padding, z-50; two tabs HOME (◯) and JOURNAL (▤) rendered as flex row with justify-around; active tab uses gold (#d4a02a), inactive uses paper/40; tab labels in JetBrains Mono, text-[10px] tracking-widest uppercase; useLocation determines active tab by pathname; useNavigate handles routing; src/main.jsx updated with AppShell wrapper component (uses useLocation, conditionally renders TabBar only on /home and /journal routes); InstallBanner and Routes wrapped inside AppShell inside AppStateProvider inside BrowserRouter; Home.jsx already had pb-20 — no change needed; build passed cleanly (93 modules, 418 kB JS)"
+    },
+    {
+      "id": 27,
+      "title": "CONTEXT.md — running project context file",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Written to CONTEXT.md in project root — update build status checklist as tasks complete"
+    },
+    {
+      "id": 28,
+      "title": "Friends list screen",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Friends.jsx: fetches friendships (user_id or friend_id = me) with joined requester/recipient user rows; computes pendingRequests (friend_id = me + status pending) and acceptedFriends (status accepted, other person); header with italic Fraunces title + rust + Add button navigating /nearby; search bar client-side filters on name; pending requests section with Accept (rust, updates status=accepted) and Decline (border, deletes row) buttons; friends list with 48px colored avatar circle (initial letter, cream text), name, FRIEND mono badge; loading skeleton (3 pulse rectangles); empty state with italic Fraunces copy + rust Find nearby CTA; TabBar.jsx updated to add FRIENDS tab (icon, path /friends); main.jsx updated with Friends import, /friends ProtectedRoute, and /friends added to AppShell showTabBar array; build passed (96 modules, 429 kB JS)"
+    },
+    {
+      "id": 29,
+      "title": "Real-time presence refresh on nearby screen",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Nearby.jsx updated: imports writePresence + deletePresence from ../lib/location; on mount (when location + user available) calls writePresence(user.id); fetches real nearby users via getNearbyUsers(user.id, lat, lng) and stores in nearby state; map pins use stable angle hash (userId.charCodeAt(0) * 137 % 360) + distance-scaled radius (distanceMiles / 0.35 * 120px) instead of random positions; refreshes every 30s via setInterval in intervalRef; live 'X seconds ago' label updated every second via timerRef; locationError case shows 'Location needed' + Enable location button + DEMO MODE label if nearbyUsers present; on unmount calls deletePresence(user.id) and clears both intervals; build passed (95 modules, 423 kB JS)"
+    },
+    {
+      "id": 30,
+      "title": "Party invite notifications (in-app)",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — supabase/party-invites-table.sql (party_invites table with from_user_id, to_user_id, session_id FKs, status text default 'pending', expires_at 5min TTL, RLS select policy for sender+recipient, insert policy for sender); src/hooks/usePartyInvites.js (subscribes to postgres_changes INSERT on party_invites filtered by to_user_id, fetches sender name from users table, calls onInvite callback with {id, sessionId, fromUserId, fromName, expiresAt}); src/screens/Nearby.jsx updated: imports supabase, adds invited Set state, sendInvite(toUserId) reads sq_session_id from localStorage and inserts row into party_invites, Invite button added to each person card (disabled+greyed after send, shows 'Invited ✓'); src/main.jsx updated: imports useState, useNavigate, useAuth, usePartyInvites; PartyInviteListener component renders fixed top banner with sender name, Join navigates /active-quest, Dismiss clears state, auto-dismisses after 30s; PartyInviteListener rendered inside AppShell after InstallBanner; build passed (98 modules, 432 kB JS)"
+    },
+    {
+      "id": 31,
+      "title": "Reaction system — send and view reactions",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/hooks/useReactions.js: fetches initial reactions from Supabase on mount, subscribes to realtime INSERT/DELETE postgres_changes filtered by session_id, toggleReaction does optimistic insert/delete, returns { reactions, myReactions (Set), toggleReaction, grouped (emoji→count map) }; src/screens/Memory.jsx: imports useReactions, removes old local reaction state + manual useEffect + old toggleReaction, calls useReactions(sessionId, user?.id), renders 5 EMOJIS as flex-col rounded-xl buttons with scale-110 + rust tint when active and count in 10px monospace below each emoji; src/screens/Journal.jsx: adds sessionReactions state, loadReactions(sessionId) fetches emoji grouping on expand, called from accordion toggle handler only when not already loaded, displays grouped reactions as '{emoji} {count}' joined with spaces below elapsed time in expanded view; supabase/reactions-rls.sql: ALTER TABLE reactions ENABLE ROW LEVEL SECURITY + three policies (authenticated read, users insert own, users delete own); build passed (97 modules, 430 kB JS)"
+    },
+    {
+      "id": 32,
+      "title": "Invite link — share a personalised signup URL",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — supabase/invite-code-column.sql (ALTER TABLE users ADD COLUMN invite_code text UNIQUE with md5 default); src/lib/invites.js (getInviteLink fetches invite_code and returns origin+/join/code URL; resolveInvite looks up user by code via maybeSingle; createFriendship checks for existing row with .or() filter before inserting accepted friend tier); src/screens/JoinViaInvite.jsx (public route /join/:code, resolves inviter on mount, stores code in localStorage sq_invite_code, shows loading spinner, invalid state, or inviter name + CTA button navigating to /); src/screens/Onboarding.jsx updated: after successful INSERT into users checks localStorage sq_invite_code, dynamic imports resolveInvite+createFriendship, creates friendship if inviter found and not self, clears key; src/screens/Friends.jsx updated: imports getInviteLink, added copied state, shareInvite() gets link then tries navigator.share (Web Share API) then falls back to clipboard copy with 2s copied feedback, + button now calls shareInvite and shows ✓ when copied; src/main.jsx updated: imports JoinViaInvite, adds public <Route path='/join/:code'> alongside Login and AuthCallback; build passed (101 modules, 437 kB JS)"
+    },
+    {
+      "id": 33,
+      "title": "Friends-of-friends graph display",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — supabase/proximity-function.sql: RETURNS TABLE extended with mutual_count int; SELECT computes mutual_count as count of the current user's direct friends who are also friends with the nearby user; src/lib/proximity.js: maps row.mutual_count to mutualCount; src/screens/Nearby.jsx: TIER_COLORS updated (friend #4a7c59 forest green, fof #d4a02a gold, open #6b8aa8 slate blue); map pins use TIER_COLORS so now correctly colored per tier; meta line per tier — friend: 'FRIEND · Xft' in paper/40; fof: 'VIA [viaName] · mutual: [mutualCount] · Xft' in gold (#d4a02a); open: 'OPEN · open to questing · Xft' in text-slate-400; build passed (95 modules, 424 kB JS)"
+    },
+    {
+      "id": 34,
+      "title": "Admin panel — manual quest drop + user overview",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Admin.jsx: gated by user.email === VITE_ADMIN_EMAIL; fetches active_quest (joined with quests.title), all quests, users (name/email/streak/created_at), and 20 most recent completed quest_sessions with user/quest joins; auto-refreshes every 30s via setInterval; Quest Controls section shows current active quest with drop time + live countdown (timeRemaining), 'Drop quest now' button calls supabase.functions.invoke('drop-quest'); Users table shows name, email, streak, joined date; Recent Sessions table shows user, quest title, completed timestamp, party size, photo indicator; access-denied screen for non-admins; /admin route added to src/main.jsx (plain Route, no ProtectedRoute — admin check is inside component); Admin imported in main.jsx; .env.example updated with VITE_ADMIN_EMAIL; build passed (102 modules, 442 kB JS)"
+    },
+    {
+      "id": 35,
+      "title": "Error boundaries + loading states throughout",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/components/Skeleton.jsx (animate-pulse bg-paper/10 with configurable width/height/borderRadius/className props); src/components/ErrorCard.jsx (warning icon, message text, optional Try again button with onRetry callback); src/components/ErrorBoundary.jsx (class component, catches uncaught render errors, shows full-screen dark fallback with Reload app button); src/hooks/useOnline.js (listens to window online/offline events, returns { isOnline }); src/main.jsx updated: imports ErrorBoundary + useOnline; OfflineBanner function component renders fixed gold top banner when offline; AppShell renders OfflineBanner before children; BrowserRouter content wrapped in ErrorBoundary; src/screens/Nearby.jsx: imports Skeleton + ErrorCard; added nearbyError state; fetchNearby sets nearbyError on catch; loading state now shows 3 Skeleton cards (64px height, 8px border-radius) instead of spinner; error state shows ErrorCard with 'Couldn\\'t load nearby friends' + onRetry=fetchNearby; src/screens/Friends.jsx: imports Skeleton; loading state replaced SkeletonFriendCard with Skeleton height=72px borderRadius=12px className=mx-5 my-1 (3 times); build passed (108 modules, 452 kB JS)"
+    },
+    {
+      "id": 36,
+      "title": "Quest session real-time party sync",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — supabase/party-status-column.sql (ALTER TABLE quest_sessions ADD COLUMN party_status jsonb DEFAULT '{}'); src/hooks/usePartySync.js (subscribes to postgres_changes UPDATE on quest_sessions filtered by sessionId, calls onPartyUpdate(party_status) on change; heartbeat every 15s upserts current user's status to 'active' with updatedAt ISO string; markCompleted() sets status to 'completed'; cleanup removes channel + clears interval); src/screens/ActiveQuest.jsx updated with: usePartySync import; partyStatuses state + sessionId from localStorage; usePartySync call with sessionId, user?.id, setPartyStatuses; getPartyStatus helper (active = status 'active' AND updatedAt <30s ago; completed = status 'completed'; otherwise unknown); PartyRow accepts partyStatuses prop, renders absolute bottom-right status dot per member (green bg-green-400 w-2 h-2 rounded-full for active, gold ✓ text-gold text-xs for completed, paper/20 grey dot for unknown); completeQuest made async and calls await markCompleted() before navigating to /memory; build passed (95 modules, 420 kB JS)"
+    },
+    {
+      "id": 37,
+      "title": "Animations and micro-interactions",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/index.css: added keyframes (screenEnter, dropBanner, pinPulse, timerShake, reactionPop, tabBounce, shutterRing) and utility classes (.screen-enter, .drop-banner, .pin-pulse, .timer-shake, .reaction-pop, .tab-bounce, .card-selected, .shutter-ring); tailwind.config.js extended with all 7 new keyframes and 7 new animation utilities (pin-pulse, tab-bounce, reaction-pop, shutter-ring, screen-enter, drop-banner, shake updated); TabBar.jsx: added bouncing state, on tab click sets bouncing to path then clears after 250ms, icon span gets animate-tab-bounce class while active; ActiveQuest.jsx: added shutterFired state, capturePhoto sets it true then clears after 400ms, shutter button wrapped in relative div, ring div with animate-shutter-ring rendered conditionally; build passed (97 modules, 430 kB JS)"
+    },
+    {
+      "id": 38,
+      "title": "Toast notification system",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/context/ToastContext.jsx: ToastContext + useToast hook + ToastProvider (max 3 toasts, auto-dismiss after 2500ms) + ToastStack (fixed top-14, z-100, animate-drop-banner, 4 type styles: default/success/error/warning); src/main.jsx: ToastProvider wraps AppStateProvider inside BrowserRouter; src/screens/ActiveQuest.jsx: showToast('Camera unavailable', 'error') on camera access failure in both enableCamera and flipCamera catch blocks; alert() calls in toggleDualMode replaced with showToast('Dual camera not supported on this device', 'warning'); src/screens/Memory.jsx: showToast(\"Photo didn't save — quest still complete\", 'warning') on completeSession error; showToast('Card saved!', 'success') after share or download completes in saveCard; src/context/AppState.jsx: showToast('Streak saved! 🧊', 'success') after useFreeze succeeds in handleUseFreeze; src/screens/Friends.jsx: showToast('Invite link copied!', 'success') after clipboard write in shareInvite; build passed (103 modules, 443 kB JS)"
+    },
+    {
+      "id": 39,
+      "title": "Offline support — cache quests and journal locally",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/lib/cache.js created with cacheGet/cacheSet/cacheClear using sq_cache_ prefix + TTL expiry in localStorage; useQuestDrop.js checks cacheGet('active_quest') on mount (instant load if hit), fetches from Supabase in background and cacheSet with 5 min TTL, also updates cache on realtime INSERT; Journal.jsx checks cacheGet('journal_' + user.id) before fetch (skips loading skeleton on cache hit), cacheSet after Supabase fetch with 10 min TTL; Home.jsx checks cacheGet('user_' + user.id) before profile fetch (sets profile/streak/freezeReady from cache immediately), Supabase fetch runs as background refresh and cacheSet with 30 min TTL; build passed cleanly (95 modules, 420 kB JS)"
+    },
+    {
+      "id": 40,
+      "title": "Settings screen",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/screens/Settings.jsx created with profile editing, streak display, invite link copy, location sharing toggle, about section, install modal, sign out and delete account. Route /settings added to main.jsx as ProtectedRoute. Home.jsx avatar button already navigated to /settings correctly."
+    },
+    {
+      "id": 41,
+      "title": "Memory card canvas download — polished version",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — saveCard() in src/screens/Memory.jsx upgraded to 1080×1920 (9:16 Stories format): dark ink background (#1a1612) with paper grain texture (8000 random semi-transparent dots); header bar with italic bold 'side / quest' logo in rust (#c44829) left and date string right; 1000×1000 photo area starting at y=140 with 32px rounded clip drawn from mainUrl or mainPhoto blob; PiP overlay (200×280, rounded 20px) with white border drawn from pipUrl or pipPhoto blob; timestamp stamp (dark pill, monospace) bottom-right of photo; quest title below photo in italic bold 52px serif; stats row with ⏱ MM:SS, 👥 SOLO/+N, ⭐ +XP in monospace; gold footer bar at y=1840 with '★ COMPLETED A SIDE / QUEST'; ctx.roundRect polyfill added for browser compatibility; share via navigator.share({ files }) on supported devices, falls back to blob download; generatingCard state drives button label 'Generating card…' while processing; build passed (95 modules, 422 kB JS)"
+    },
+    {
+      "id": 42,
+      "title": "Location context — tailor quests to where you are",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — src/lib/locationContext.js (getLocationContext fetches Nominatim reverse-geocode API, derives contexts array ['universal', ...] from display_name regex + addr fields, extracts human label from neighbourhood/suburb/quarter/city/town/village, caches 1hr in localStorage via cacheGet/cacheSet); Home.jsx updated: imports getLocationContext, adds locationLabel state, useEffect on location change calls getLocationContext and setLocationLabel, locationPillLabel shows '◉ {label}' when label + location active, simulateDrop now async + passes context_tags to drop-quest Edge Function; QuestDrop.jsx updated: imports getLocationContext + useLocation hook (aliased useUserLocation), adds contextLabel state, useEffect on location calls getLocationContext + setContextLabel, quest card shows '▾ TAILORED FOR {LABEL}' above title when contextLabel set; build passed (109 modules, 453 kB JS)"
+    },
+    {
+      "id": 43,
+      "title": "Performance audit + image optimisation",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — supabase/indexes.sql: 9 performance indexes (quest_sessions user_id, completed_at DESC, party_ids GIN, friendships user_id + friend_id, presence updated_at, analytics_events user_id + event, reactions session_id); Journal.jsx: infinite scroll added (initial load 20 via .range(0,19), loadMore() fetches next 20 with .range(nextPage*20, nextPage*20+19), appends to sessions, hasMore/page/loadingMore state, Load more button shown when hasMore && sessions.length>0); img tags already had loading='lazy' and ?width=200&quality=60 transform params; Friends.jsx: no img tags (div-based avatars) — no change needed; Memory.jsx: PiP img alt updated to 'PiP photo', main photo already had alt='quest photo'; index.html: added description, og:title, og:description, og:type meta tags; build passed (109 modules, 454 kB JS)"
+    },
+    {
+      "id": 44,
+      "title": "Test checklist — run through before inviting friends",
+      "who": "Friend",
+      "status": "skipped",
+      "notes": "Manual device testing"
+    },
+    {
+      "id": 45,
+      "title": "Invite message — what to send to your 50 testers",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — docs/invite-messages.md: three invite message versions (close friends, wider network, group chat), 48h follow-up message, and feedback form message with [YOUR_NAME], [INSTALL_LINK], [FEEDBACK_FORM_LINK] placeholders"
+    },
+    {
+      "id": 46,
+      "title": "Feedback form — 5 questions to send after first quest",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — docs/feedback-form.md: 5 questions covering drop timing (multiple choice), quest completion (multiple choice), nearby friends experience (multiple choice), memory card reaction (multiple choice), Day 2 likelihood (linear scale 1-5); plus optional open-text Q6, form intro paragraph, thank-you message, and Google Forms setup notes"
+    },
+    {
+      "id": 47,
+      "title": "Analytics — track the 5 key metrics",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — supabase/analytics-table.sql (analytics_events table with user_id FK, event text, properties jsonb, created_at; three indexes; RLS insert policy for users + select policy for service role); src/lib/analytics.js (track() function with silent error catching, EVENTS constants: APP_OPENED, QUEST_DROP_SEEN, QUEST_STARTED, QUEST_COMPLETED, QUEST_SKIPPED, QUEST_ABANDONED)"
+    },
+    {
+      "id": 48,
+      "title": "Custom domain + production environment",
+      "who": "Friend",
+      "status": "skipped",
+      "notes": "Manual step — friend does with Vercel + registrar"
+    },
+    {
+      "id": 49,
+      "title": "What to watch on launch day",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — docs/launch-runbook.md: day-before prep (install count gate, quest selection criteria, pre-written launch message, checklist); launch morning setup + drop trigger; 45-minute window timeline with metric tables; real-time bug handling + manual SQL fallback INSERT for active_quest; post-drop timing (feedback form at T+2h), healthy metric ranges, red flag numbers; day-after Day 2 retention SQL query, follow-up flow, and iteration priority framework"
+    },
+    {
+      "id": 50,
+      "title": "What to build next — based on test results",
+      "who": "Claude",
+      "status": "completed",
+      "completedAt": "2026-05-07T00:00:00Z",
+      "notes": "Done — docs/whats-next.md: decision tree covering completion rate (high >60% / low <30%), social behavior (high solo >70% / high party >50%), Day 2 retention (low <30% / high >50%), and five qualitative signal branches from feedback (forgot it existed, no one nearby, lame quest, didn't understand, loved it but friends didn't); ends with the one metric to obsess over in month 1 (Day 2 retention) and the criteria for when you're ready to scale"
+    }
+  ]
+}

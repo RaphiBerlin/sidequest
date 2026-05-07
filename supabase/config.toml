@@ -1,0 +1,2 @@
+[functions.drop-quest]
+verify_jwt = false

@@ -1,0 +1,22 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Supabase local dev
+supabase/.branches
+supabase/.temp
