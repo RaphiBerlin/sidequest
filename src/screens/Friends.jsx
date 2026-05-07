@@ -122,18 +122,13 @@ export default function Friends() {
     setContactsLoading(true)
     try {
       const phones = await getContactPhones()
-      if (phones.length === 0) {
-        setContactsScanned(true)
-        setContactsLoading(false)
-        return
+      if (phones.length > 0) {
+        const hashes = await hashContactPhones(phones)
+        await supabase.rpc('store_contact_hashes', { hashes })
       }
-      const hashes = await hashContactPhones(phones)
-      const { data, error } = await supabase.rpc('find_users_by_phone_hashes', {
-        phone_hashes: hashes,
-      })
+      const { data, error } = await supabase.rpc('get_contact_suggestions')
       if (error) throw error
-      const alreadyFriendIds = new Set(acceptedFriends.map(f => f.id))
-      setContactMatches((data || []).filter(u => !alreadyFriendIds.has(u.user_id)))
+      setContactMatches((data || []).filter(u => !u.already_friends))
     } catch (e) {
       if (e.name !== 'AbortError') showToast('Could not access contacts', 'error')
     }
@@ -231,6 +226,10 @@ export default function Friends() {
               <AvatarCircle name={match.name} avatarColor={match.avatar_color} />
               <div className="flex-1 min-w-0">
                 <p className="text-dark font-medium truncate">{match.name}</p>
+                <p className="text-dark/40 text-xs truncate"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  {match.connection_type === 'fof' ? `friend of ${match.via_name}` : 'in your contacts'}
+                </p>
               </div>
               <button
                 onClick={() => addFromContacts(match.user_id)}
