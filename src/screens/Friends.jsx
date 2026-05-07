@@ -184,9 +184,9 @@ export default function Friends() {
       />
 
       {/* Find from contacts */}
-      {contactsSupported() && !contactsScanned && (
+      {!contactsScanned && (
         <button
-          onClick={findFromContacts}
+          onClick={contactsSupported() ? findFromContacts : () => setContactsScanned(true)}
           disabled={contactsLoading}
           className="mx-5 mb-4 w-[calc(100%-40px)] py-2.5 px-4 rounded-xl border border-dark/15 flex items-center gap-3 text-left hover:bg-dark/5 transition-colors disabled:opacity-40"
         >
@@ -202,7 +202,7 @@ export default function Friends() {
               className="text-dark/40 text-xs"
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              See who's already on the app
+              {contactsSupported() ? 'See who\'s already on the app' : 'Open on mobile to import contacts'}
             </p>
           </div>
           <span className="text-dark/30 text-sm">→</span>
