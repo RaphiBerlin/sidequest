@@ -71,6 +71,8 @@ export default function Onboarding() {
       if (normalized) {
         const hash = await sha256hex(normalized)
         await supabase.from('users').update({ phone_hash: hash }).eq('id', user.id)
+        // Auto-friend anyone who already has this number in their contacts
+        await supabase.rpc('create_auto_friendships')
       }
       setLoading(false)
     }
@@ -84,6 +86,8 @@ export default function Onboarding() {
       if (phones.length > 0) {
         const hashes = await hashContactPhones(phones)
         await supabase.rpc('store_contact_hashes', { hashes })
+        // Auto-friend anyone whose number matches
+        await supabase.rpc('create_auto_friendships')
       }
     } catch (e) {
       // AbortError = user cancelled, that's fine
