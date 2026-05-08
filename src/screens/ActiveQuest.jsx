@@ -39,7 +39,7 @@ export default function ActiveQuest() {
 
   // Party sync state
   const [partyStatuses, setPartyStatuses] = useState({})
-  const sessionId = localStorage.getItem('sq_session_id')
+  const [sessionId, setSessionId] = useState(() => localStorage.getItem('sq_session_id'))
   const { markCompleted } = usePartySync(sessionId, user?.id, setPartyStatuses)
 
   // Timer state
@@ -105,6 +105,9 @@ export default function ActiveQuest() {
 
       if (!error && data?.id) {
         localStorage.setItem('sq_session_id', data.id)
+        setSessionId(data.id)
+      } else if (error) {
+        console.error('Session creation failed:', error)
       }
     }
 
@@ -238,7 +241,7 @@ export default function ActiveQuest() {
     const startedAtStr = localStorage.getItem('sq_session_started_at')
     const startedAt = startedAtStr ? new Date(startedAtStr) : new Date()
     const elapsedSec = Math.round((Date.now() - startedAt.getTime()) / 1000)
-    const sessionId = localStorage.getItem('sq_session_id')
+    // sessionId comes from state (set when session was created), not re-read from localStorage
 
     // Mark current user as completed in party_status
     await markCompleted()
@@ -267,7 +270,7 @@ export default function ActiveQuest() {
         elapsedSec,
       },
     })
-  }, [navigate, activeQuest, party, markCompleted])
+  }, [navigate, activeQuest, party, markCompleted, sessionId])
 
   // ── Capture photo ─────────────────────────────────────────────────────────
   const capturePhoto = useCallback(() => {
