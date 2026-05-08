@@ -93,7 +93,7 @@ export default function Admin() {
   async function seedSessions(userId) {
     setSeeding(userId)
     try {
-      const { error } = await supabase.functions.invoke('admin-seed', { body: { user_id: userId } })
+      const { error } = await supabase.rpc('seed_test_sessions', { target_user_id: userId })
       if (error) alert('Seed failed: ' + error.message)
       else await fetchData()
     } finally {
