@@ -97,10 +97,10 @@ export default function Memory() {
       }
 
       // Header bar (top 120px)
-      // Logo: "side / quest" left
+      // Logo: "sidequest" left
       ctx.fillStyle = '#c44829'
       ctx.font = 'italic bold 48px serif'
-      ctx.fillText('side / quest', 60, 78)
+      ctx.fillText('sidequest', 60, 78)
 
       // Date right
       const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
@@ -210,7 +210,7 @@ export default function Memory() {
 
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({ files: [file], title: 'Side / Quest', text: quest?.title || 'Quest Complete' })
+            await navigator.share({ files: [file], title: 'Sidequest', text: quest?.title || 'Quest Complete' })
             showToast('Card saved!', 'success')
             return
           } catch (e) {

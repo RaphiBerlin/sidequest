@@ -108,7 +108,7 @@ export default function Friends() {
     const link = await getInviteLink(user.id)
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Join me on Side / Quest', text: 'Come quest with me!', url: link })
+        await navigator.share({ title: 'Join me on Sidequest', text: 'Come quest with me!', url: link })
         return
       } catch (e) {}
     }

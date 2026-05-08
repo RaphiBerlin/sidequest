@@ -34,7 +34,7 @@ export default function JoinViaInvite() {
     <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-8 text-center gap-6" style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}>
       <h1 className="text-rust italic text-3xl" style={{ fontFamily: "'Fraunces', serif" }}>side/quest</h1>
       <p className="text-paper/80 text-lg">
-        <span className="text-paper font-medium">{inviter.name}</span> invited you to Side / Quest
+        <span className="text-paper font-medium">{inviter.name}</span> invited you to Sidequest
       </p>
       <p className="text-paper/40 text-sm">The daily outdoor quest app for friends.</p>
       <button
