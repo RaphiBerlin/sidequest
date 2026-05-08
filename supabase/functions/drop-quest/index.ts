@@ -1,32 +1,43 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // 1. Pick a random quest
-  const { data: quests, error: questsError } = await supabase
-    .from("quests")
-    .select("id")
-    .limit(1)
-    .order("id", { ascending: false }) // stable enough order for offset trick
-    .throwOnError();
+  // 1. Pick quest — use provided ID or fall back to random
+  let questId: string | null = null;
+  try {
+    const body = await req.json();
+    questId = body?.quest_id ?? null;
+  } catch { /* no body */ }
 
-  // Use a random offset against the full table count
-  const { count } = await supabase
-    .from("quests")
-    .select("*", { count: "exact", head: true })
-    .throwOnError();
+  let picked: { id: string } | null = null;
+  let pickError: { message: string } | null = null;
 
-  const randomOffset = Math.floor(Math.random() * (count ?? 1));
-
-  const { data: picked, error: pickError } = await supabase
-    .from("quests")
-    .select("id")
-    .range(randomOffset, randomOffset)
-    .single();
+  if (questId) {
+    const { data, error } = await supabase
+      .from("quests")
+      .select("id")
+      .eq("id", questId)
+      .single();
+    picked = data;
+    pickError = error;
+  } else {
+    const { count } = await supabase
+      .from("quests")
+      .select("*", { count: "exact", head: true })
+      .throwOnError();
+    const randomOffset = Math.floor(Math.random() * (count ?? 1));
+    const { data, error } = await supabase
+      .from("quests")
+      .select("id")
+      .range(randomOffset, randomOffset)
+      .single();
+    picked = data;
+    pickError = error;
+  }
 
   if (pickError || !picked) {
     return Response.json(

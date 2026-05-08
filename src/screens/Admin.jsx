@@ -58,7 +58,9 @@ export default function Admin() {
 
   async function dropQuest() {
     setDropping(true)
-    await supabase.functions.invoke('drop-quest')
+    await supabase.functions.invoke('drop-quest', {
+      body: selectedQuestId ? { quest_id: selectedQuestId } : {},
+    })
     await fetchData()
     setDropping(false)
   }
@@ -107,13 +109,23 @@ export default function Admin() {
             <p className="text-paper/40 text-sm font-mono">No active quest</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <select
+            value={selectedQuestId}
+            onChange={e => setSelectedQuestId(e.target.value)}
+            className="flex-1 bg-paper/5 border border-paper/20 text-paper text-xs font-mono px-3 py-2 rounded outline-none"
+          >
+            <option value="">Random quest</option>
+            {quests.map(q => (
+              <option key={q.id} value={q.id}>{q.title}</option>
+            ))}
+          </select>
           <button
             onClick={dropQuest}
             disabled={dropping}
-            className="bg-rust text-dark text-xs font-mono px-4 py-2 tracking-widest uppercase disabled:opacity-50"
+            className="bg-rust text-dark text-xs font-mono px-4 py-2 tracking-widest uppercase disabled:opacity-50 whitespace-nowrap"
           >
-            {dropping ? 'Dropping…' : 'Drop quest now'}
+            {dropping ? 'Dropping…' : 'Drop now'}
           </button>
         </div>
       </section>
