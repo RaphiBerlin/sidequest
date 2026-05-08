@@ -20,5 +20,7 @@ export async function getNearbyUsers(userId, lat, lng) {
     tier: row.tier, // 'friend' | 'fof' | 'open'
     viaName: row.via_name ?? null,
     mutualCount: row.mutual_count ?? 0,
+    lat: row.lat,
+    lng: row.lng,
   }))
 }

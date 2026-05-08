@@ -11,7 +11,7 @@ import FeedCard from '../components/FeedCard'
 export default function Home() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
-  const { activeQuest, loading: questLoading } = useQuestDrop()
+  const { activeQuest, loading: questLoading, newDrop, clearNewDrop } = useQuestDrop()
   const { location, locationError, locationLoading, requestLocation } = useLocation()
   const [profile, setProfile] = useState(null)
   const [recentSessions, setRecentSessions] = useState([])
@@ -63,6 +63,12 @@ export default function Home() {
       setLocationLabel(result.label)
     })
   }, [location])
+
+  useEffect(() => {
+    if (!newDrop) return
+    const timer = setTimeout(() => clearNewDrop(), 6000)
+    return () => clearTimeout(timer)
+  }, [newDrop])
 
   async function fetchFeed() {
     if (!user) return
@@ -120,6 +126,29 @@ export default function Home() {
 
   return (
     <div className="screen-enter min-h-screen bg-dark flex flex-col pb-20 overflow-y-auto" style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}>
+      {/* Quest drop notification banner */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${newDrop ? 'translate-y-0' : '-translate-y-full'}`}
+        style={{ backgroundColor: '#c44829' }}
+      >
+        <button
+          className="w-full flex items-center gap-3 px-5 py-3 text-left"
+          style={{ color: '#1a1612' }}
+          onClick={() => { clearNewDrop(); navigate('/quest-drop', { state: { activeQuest } }) }}
+        >
+          <span className="text-lg">🔥</span>
+          <span className="flex-1 text-sm font-medium" style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}>
+            Quest dropped! — {activeQuest?.quest?.title ?? 'New quest'}
+          </span>
+          <span
+            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity"
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14 }}
+            onClick={(e) => { e.stopPropagation(); clearNewDrop() }}
+          >
+            ✕
+          </span>
+        </button>
+      </div>
       {/* Status bar */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4">
         <h1 className="text-rust italic text-2xl" style={{ fontFamily: "'Fraunces', serif" }}>

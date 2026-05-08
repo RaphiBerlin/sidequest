@@ -11,7 +11,9 @@ RETURNS TABLE (
   distance_miles float,
   tier text,
   via_name text,
-  mutual_count int
+  mutual_count int,
+  lat float,
+  lng float
 )
 LANGUAGE plpgsql
 AS $$
@@ -22,6 +24,8 @@ BEGIN
     distances AS (
       SELECT
         p.user_id,
+        p.lat,
+        p.lng,
         (
           3958.8 * acos(
             LEAST(1.0, cos(radians(my_lat)) * cos(radians(p.lat)) *
@@ -75,7 +79,9 @@ BEGIN
         WHERE (f3.user_id = d.user_id OR f3.friend_id = d.user_id)
           AND f3.status = 'accepted'
       )
-    ) AS mutual_count
+    ) AS mutual_count,
+    d.lat,
+    d.lng
   FROM distances d
   JOIN users u ON u.id = d.user_id
   WHERE d.dist_miles < 0.35

@@ -5,6 +5,7 @@ import { cacheGet, cacheSet } from '../lib/cache'
 export function useQuestDrop() {
   const [activeQuest, setActiveQuest] = useState(undefined) // undefined = loading
   const [loading, setLoading] = useState(true)
+  const [newDrop, setNewDrop] = useState(false)
 
   useEffect(() => {
     // Check cache before hitting Supabase
@@ -41,6 +42,7 @@ export function useQuestDrop() {
             .eq('id', payload.new.id)
             .single()
           setActiveQuest(data)
+          setNewDrop(true)
           cacheSet('active_quest', data, 5 * 60 * 1000)
         }
       )
@@ -49,5 +51,5 @@ export function useQuestDrop() {
     return () => supabase.removeChannel(channel)
   }, [])
 
-  return { activeQuest, loading }
+  return { activeQuest, loading, newDrop, clearNewDrop: () => setNewDrop(false) }
 }
