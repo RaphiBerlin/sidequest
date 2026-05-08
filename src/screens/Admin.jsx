@@ -18,6 +18,7 @@ export default function Admin() {
   const [editingQuestId, setEditingQuestId] = useState(null)
   const [editQuest, setEditQuest] = useState({})
   const [saving, setSaving] = useState(false)
+  const [seeding, setSeeding] = useState(null)
 
   useEffect(() => {
     if (!user) return
@@ -87,6 +88,17 @@ export default function Admin() {
   async function toggleAdmin(userId, current) {
     await supabase.from('users').update({ is_admin: !current }).eq('id', userId)
     await fetchData()
+  }
+
+  async function seedSessions(userId) {
+    setSeeding(userId)
+    try {
+      const { error } = await supabase.functions.invoke('admin-seed', { body: { user_id: userId } })
+      if (error) alert('Seed failed: ' + error.message)
+      else await fetchData()
+    } finally {
+      setSeeding(null)
+    }
   }
 
   function timeRemaining(expiresAt) {
@@ -240,7 +252,8 @@ export default function Admin() {
                 <th className="text-left py-2 pr-4">Email</th>
                 <th className="text-left py-2 pr-4">Streak</th>
                 <th className="text-left py-2 pr-4">Admin</th>
-                <th className="text-left py-2">Joined</th>
+                <th className="text-left py-2 pr-4">Joined</th>
+                <th className="text-left py-2">Seed</th>
               </tr>
             </thead>
             <tbody>
@@ -261,7 +274,16 @@ export default function Admin() {
                       </button>
                     )}
                   </td>
-                  <td className="py-2 text-paper/40">{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="py-2 pr-4 text-paper/40">{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="py-2">
+                    <button
+                      onClick={() => seedSessions(u.id)}
+                      disabled={seeding === u.id}
+                      className="px-2 py-0.5 border border-paper/20 text-paper/30 text-xs hover:border-gold hover:text-gold transition-colors disabled:opacity-40"
+                    >
+                      {seeding === u.id ? '…' : '+3'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
