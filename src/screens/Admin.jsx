@@ -13,6 +13,9 @@ export default function Admin() {
   const [dropping, setDropping] = useState(false)
   const [selectedQuestId, setSelectedQuestId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showCreateQuest, setShowCreateQuest] = useState(false)
+  const [newQuest, setNewQuest] = useState({ title: '', description: '', duration_min: 45 })
+  const [creating, setCreating] = useState(false)
 
   const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL
 
@@ -34,7 +37,7 @@ export default function Admin() {
     setActiveQuest(aq)
 
     // All quests for picker
-    const { data: q } = await supabase.from('quests').select('id, title').order('title')
+    const { data: q } = await supabase.from('quests').select('id, title, description, duration_min').order('title')
     setQuests(q || [])
 
     // Users with session count
@@ -54,6 +57,20 @@ export default function Admin() {
     setRecentSessions(s || [])
 
     setLoading(false)
+  }
+
+  async function createQuest() {
+    if (!newQuest.title.trim()) return
+    setCreating(true)
+    await supabase.from('quests').insert({
+      title: newQuest.title.trim(),
+      description: newQuest.description.trim(),
+      duration_min: Number(newQuest.duration_min) || 45,
+    })
+    setNewQuest({ title: '', description: '', duration_min: 45 })
+    setShowCreateQuest(false)
+    await fetchData()
+    setCreating(false)
   }
 
   async function dropQuest() {
@@ -96,20 +113,23 @@ export default function Admin() {
       {/* Quest Controls */}
       <section className="mb-8">
         <h2 className="text-gold font-mono text-xs tracking-widest uppercase mb-3">Quest Controls</h2>
+
+        {/* Active quest */}
         <div className="bg-paper/5 rounded-xl p-4 border border-paper/10 mb-3">
           {activeQuest ? (
             <div>
               <p className="text-paper text-sm font-medium">{activeQuest.quest?.title}</p>
               <p className="text-paper/40 text-xs font-mono mt-1">
-                Dropped: {new Date(activeQuest.dropped_at).toLocaleTimeString()} ·
-                Expires in: {timeRemaining(activeQuest.expires_at)}
+                Dropped: {new Date(activeQuest.dropped_at).toLocaleTimeString()} · Expires in: {timeRemaining(activeQuest.expires_at)}
               </p>
             </div>
           ) : (
             <p className="text-paper/40 text-sm font-mono">No active quest</p>
           )}
         </div>
-        <div className="flex gap-2 items-center">
+
+        {/* Drop picker */}
+        <div className="flex gap-2 items-center mb-6">
           <select
             value={selectedQuestId}
             onChange={e => setSelectedQuestId(e.target.value)}
@@ -127,6 +147,77 @@ export default function Admin() {
           >
             {dropping ? 'Dropping…' : 'Drop now'}
           </button>
+        </div>
+
+        {/* Selected quest description */}
+        {selectedQuestId && (() => {
+          const q = quests.find(q => q.id === selectedQuestId)
+          return q?.description ? (
+            <div className="bg-paper/5 rounded-lg p-3 border border-paper/10 mb-4">
+              <p className="text-paper/60 text-xs font-mono">{q.description}</p>
+              <p className="text-paper/30 text-xs font-mono mt-1">{q.duration_min} min</p>
+            </div>
+          ) : null
+        })()}
+
+        {/* Quest list */}
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-paper/40 text-xs font-mono">All quests ({quests.length})</p>
+          <button
+            onClick={() => setShowCreateQuest(v => !v)}
+            className="text-xs font-mono border border-paper/20 px-3 py-1 text-paper/60 hover:border-gold hover:text-gold transition-colors"
+          >
+            {showCreateQuest ? 'Cancel' : '+ New quest'}
+          </button>
+        </div>
+
+        {/* Create quest form */}
+        {showCreateQuest && (
+          <div className="bg-paper/5 rounded-xl p-4 border border-paper/10 mb-3 flex flex-col gap-3">
+            <input
+              placeholder="Quest title"
+              value={newQuest.title}
+              onChange={e => setNewQuest(p => ({ ...p, title: e.target.value }))}
+              className="bg-transparent border-b border-paper/20 text-paper text-sm font-mono py-1 outline-none placeholder-paper/30"
+            />
+            <textarea
+              placeholder="Description (optional)"
+              value={newQuest.description}
+              onChange={e => setNewQuest(p => ({ ...p, description: e.target.value }))}
+              rows={2}
+              className="bg-transparent border-b border-paper/20 text-paper text-sm font-mono py-1 outline-none placeholder-paper/30 resize-none"
+            />
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                placeholder="Duration (min)"
+                value={newQuest.duration_min}
+                onChange={e => setNewQuest(p => ({ ...p, duration_min: e.target.value }))}
+                className="bg-transparent border-b border-paper/20 text-paper text-sm font-mono py-1 outline-none w-32"
+              />
+              <button
+                onClick={createQuest}
+                disabled={creating || !newQuest.title.trim()}
+                className="ml-auto bg-gold text-dark text-xs font-mono px-4 py-1.5 tracking-widest uppercase disabled:opacity-50"
+              >
+                {creating ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Quest list */}
+        <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+          {quests.map(q => (
+            <div
+              key={q.id}
+              className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedQuestId === q.id ? 'border-rust bg-rust/5' : 'border-paper/10 bg-paper/5 hover:border-paper/20'}`}
+              onClick={() => setSelectedQuestId(q.id === selectedQuestId ? '' : q.id)}
+            >
+              <p className="text-paper text-xs font-mono">{q.title}</p>
+              {q.description && <p className="text-paper/40 text-xs mt-0.5 line-clamp-1">{q.description}</p>}
+            </div>
+          ))}
         </div>
       </section>
 
