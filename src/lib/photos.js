@@ -50,13 +50,15 @@ export async function completeSession({ sessionId, userId, mainPhoto, pipPhoto, 
     pipPhoto ? uploadPhoto(pipPhoto, userId, sessionId, 'pip') : Promise.resolve(null),
   ])
 
-  await supabase.from('quest_sessions').update({
+  const { error: updateError } = await supabase.from('quest_sessions').update({
     photo_url: mainUrl,
     pip_photo_url: pipUrl,
     completed_at: new Date().toISOString(),
     elapsed_sec: elapsedSec,
-    xp_earned: 100, // default XP; can be from quest.xp
+    xp_earned: 100,
   }).eq('id', sessionId)
+
+  if (updateError) console.error('completeSession update failed:', updateError)
 
   return { mainUrl, pipUrl }
 }

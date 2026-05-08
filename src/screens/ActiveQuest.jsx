@@ -253,6 +253,10 @@ export default function ActiveQuest() {
       pipStreamRef.current = null
     }
 
+    // Clear session keys so the next quest gets a fresh session
+    localStorage.removeItem('sq_session_id')
+    localStorage.removeItem('sq_session_started_at')
+
     navigate('/memory', {
       state: {
         mainPhoto,
