@@ -7,8 +7,12 @@ import { writePresence, deletePresence } from '../lib/location'
 import { supabase } from '../lib/supabase'
 import Skeleton from '../components/Skeleton'
 import ErrorCard from '../components/ErrorCard'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 
-const TIER_COLORS = { friend: '#4a7c59', fof: '#d4a02a', open: '#6b8aa8' }
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN
+
+const TIER_COLORS = { friend: '#c44829', fof: '#d4a02a', open: '#6b8aa8' }
 
 function AvatarCircle({ name, color, size = 40 }) {
   return (
@@ -34,6 +38,9 @@ export default function Nearby() {
   const [secsAgo, setSecsAgo] = useState(null)
   const intervalRef = useRef(null)
   const timerRef = useRef(null)
+  const mapContainerRef = useRef(null)
+  const mapRef = useRef(null)
+  const markersRef = useRef([])
 
   async function fetchNearby() {
     if (!user || !location) return
@@ -76,6 +83,44 @@ export default function Nearby() {
     }
   }, [location, user])
 
+  // Init map once location is known
+  useEffect(() => {
+    if (!location || mapRef.current) return
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [location.lng, location.lat],
+      zoom: 15.5,
+      interactive: true,
+      attributionControl: false,
+    })
+    // You are here marker
+    const el = document.createElement('div')
+    el.style.cssText = 'width:14px;height:14px;background:#c44829;border-radius:50%;border:2px solid #1a1612;box-shadow:0 0 0 4px rgba(196,72,41,0.3)'
+    new mapboxgl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(mapRef.current)
+    return () => { mapRef.current?.remove(); mapRef.current = null }
+  }, [location])
+
+  // Update nearby user markers when data changes
+  useEffect(() => {
+    if (!mapRef.current || !nearby.length) return
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = nearby.map(u => {
+      if (!u.lng || !u.lat) return null
+      const el = document.createElement('div')
+      const color = TIER_COLORS[u.tier] || '#888'
+      el.style.cssText = `width:12px;height:12px;background:${color};border-radius:50%;border:2px solid #1a1612;cursor:pointer`
+      el.title = u.name
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([u.lng, u.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 12, closeButton: false })
+          .setHTML(`<span style="font-family:'Bricolage Grotesque',sans-serif;font-size:13px;color:#1a1612">${u.name}</span>`))
+        .addTo(mapRef.current)
+      el.addEventListener('click', () => toggleSelect(u.userId))
+      return marker
+    }).filter(Boolean)
+  }, [nearby])
+
   async function sendInvite(toUserId) {
     const sessionId = localStorage.getItem('sq_session_id')
     if (!sessionId) return
@@ -98,21 +143,6 @@ export default function Nearby() {
     navigate('/active-quest', { state: { activeQuest: routerState?.activeQuest, party } })
   }
 
-  // Map pin positions: stable angle from userId hash + distance-scaled radius
-  const canvasSize = 280
-  const center = canvasSize / 2
-  const MAX_RADIUS_PX = 120
-  const MAX_DIST_MILES = 0.35
-  const pins = nearby.map(u => {
-    const angle = (u.userId.charCodeAt(0) * 137) % 360
-    const scaledDist = (u.distanceMiles / MAX_DIST_MILES) * MAX_RADIUS_PX
-    const rad = angle * Math.PI / 180
-    return {
-      ...u,
-      x: center + Math.cos(rad) * scaledDist,
-      y: center + Math.sin(rad) * scaledDist,
-    }
-  })
 
   if (locationError) {
     return (
@@ -157,28 +187,9 @@ export default function Nearby() {
         </p>
       </div>
 
-      {/* Map canvas */}
-      <div className="mx-5 mb-4 rounded-xl overflow-hidden relative bg-dark border border-paper/10" style={{ height: canvasSize }}>
-        {/* Grid background */}
-        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(244,237,224,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(244,237,224,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-        {/* Radius ring */}
-        <div className="absolute rounded-full border border-dashed border-paper/10" style={{ width: 180, height: 180, left: center - 90, top: center - 90 }} />
-        {/* Friend pins */}
-        {pins.map(pin => (
-          <button
-            key={pin.userId}
-            onClick={() => toggleSelect(pin.userId)}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2"
-            style={{ left: pin.x, top: pin.y }}
-          >
-            <div className="w-3 h-3 rounded-full border-2 border-dark" style={{ backgroundColor: TIER_COLORS[pin.tier] || '#888' }} />
-          </button>
-        ))}
-        {/* You are here */}
-        <div className="absolute transform -translate-x-1/2 -translate-y-1/2" style={{ left: center, top: center }}>
-          <div className="w-3 h-3 rounded-full bg-rust" />
-          <div className="absolute inset-0 rounded-full bg-rust/30 animate-ping" />
-        </div>
+      {/* Mapbox map */}
+      <div className="mx-5 mb-4 rounded-xl overflow-hidden border border-paper/10" style={{ height: 280 }}>
+        <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
       </div>
 
       {/* Legend */}

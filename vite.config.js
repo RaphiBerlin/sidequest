@@ -7,8 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
       manifest: {
-        name: 'Side / Quest',
+        name: 'Sidequest',
         short_name: 'SideQuest',
         theme_color: '#1a1612',
         background_color: '#1a1612',
