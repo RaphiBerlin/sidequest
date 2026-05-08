@@ -20,3 +20,6 @@ npm-debug.log*
 # Supabase local dev
 supabase/.branches
 supabase/.temp
+
+# VAPID private key (add to Supabase secrets manually)
+.vapid-private

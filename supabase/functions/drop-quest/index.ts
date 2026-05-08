@@ -59,7 +59,15 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 3. Insert the new active quest
+  // 3. Fetch quest title for the push notification
+  const { data: questData } = await supabase
+    .from("quests")
+    .select("title")
+    .eq("id", picked.id)
+    .single();
+  const questTitle = questData?.title ?? "A new quest awaits";
+
+  // 4. Insert the new active quest
   const { error: insertError } = await supabase
     .from("active_quest")
     .insert({
@@ -75,6 +83,13 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 4. Return confirmation
-  return Response.json({ success: true, quest_id: picked.id });
+  // 5. Return confirmation
+  const response = Response.json({ success: true, quest_id: picked.id });
+
+  // Fire push notification (non-blocking)
+  supabase.functions.invoke('send-push', {
+    body: { title: '🔥 Quest dropped!', body: questTitle, url: '/quest-drop' }
+  }).catch(() => {}) // Don't fail the drop if push fails
+
+  return response;
 });

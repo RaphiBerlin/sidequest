@@ -9,6 +9,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        importScripts: ['/push-handler.js'],
       },
       manifest: {
         name: 'Sidequest',

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useQuestDrop } from '../hooks/useQuestDrop'
 import { useLocation } from '../hooks/useLocation'
+import { usePushSubscription } from '../hooks/usePushSubscription'
 import { supabase } from '../lib/supabase'
 import { cacheGet, cacheSet } from '../lib/cache'
 import { getLocationContext } from '../lib/locationContext'
@@ -21,6 +22,11 @@ export default function Home() {
   const [locationLabel, setLocationLabel] = useState(null)
   const [feed, setFeed] = useState([])
   const [feedLoading, setFeedLoading] = useState(true)
+  const [notifPermission, setNotifPermission] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+  )
+
+  usePushSubscription(user?.id)
 
   useEffect(() => {
     if (!user) return
@@ -102,6 +108,12 @@ export default function Home() {
     }
   }
 
+  async function enablePushAlerts() {
+    if (typeof Notification === 'undefined') return
+    const result = await Notification.requestPermission()
+    setNotifPermission(result)
+  }
+
   async function simulateDrop() {
     setDropping(true)
     try {
@@ -177,6 +189,17 @@ export default function Home() {
         >
           {locationLoading ? '◌ Locating…' : locationPillLabel}
         </button>
+
+        {/* Push notification opt-in — only when permission not yet decided */}
+        {notifPermission === 'default' && (
+          <button
+            onClick={enablePushAlerts}
+            className="mt-2 text-xs border border-paper/10 text-paper/40 px-3 py-1 rounded-full hover:border-paper/20 hover:text-paper/60 transition-colors"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            🔔 Enable quest alerts
+          </button>
+        )}
       </div>
 
       {/* Quest state */}
