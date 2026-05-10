@@ -19,10 +19,15 @@ export default function Admin() {
   const [editQuest, setEditQuest] = useState({})
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(null)
+  const [schedule, setSchedule] = useState([])
+  const [scheduleQuestId, setScheduleQuestId] = useState('')
+  const [scheduleAt, setScheduleAt] = useState('')
+  const [scheduleLabel, setScheduleLabel] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [cancellingId, setCancellingId] = useState(null)
 
   useEffect(() => {
     if (!user) return
-    // Check admin: env email OR is_admin flag in DB
     const envAdmin = user.email === import.meta.env.VITE_ADMIN_EMAIL
     if (envAdmin) { setIsAdmin(true); return }
     supabase.from('users').select('is_admin').eq('id', user.id).single()
@@ -37,16 +42,18 @@ export default function Admin() {
   }, [isAdmin])
 
   async function fetchData() {
-    const [aq, q, u, s] = await Promise.all([
+    const [aq, q, u, s, sc] = await Promise.all([
       supabase.from('active_quest').select('*, quest:quests(title)').order('dropped_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('quests').select('id, title, description, duration_min').order('title'),
       supabase.from('users').select('id, name, email, streak, is_admin, created_at').order('created_at', { ascending: false }),
       supabase.from('quest_sessions').select('id, completed_at, photo_url, party_ids, user:users(name), quest:quests(title)').not('completed_at', 'is', null).order('completed_at', { ascending: false }).limit(20),
+      supabase.from('quest_schedule').select('id, scheduled_at, label, executed, executed_at, quest:quest_id(title)').order('scheduled_at', { ascending: true }).limit(20),
     ])
     setActiveQuest(aq.data)
     setQuests(q.data || [])
     setUsers(u.data || [])
     setRecentSessions(s.data || [])
+    setSchedule(sc.data || [])
     setLoading(false)
   }
 
@@ -88,6 +95,38 @@ export default function Admin() {
   async function toggleAdmin(userId, current) {
     await supabase.from('users').update({ is_admin: !current }).eq('id', userId)
     await fetchData()
+  }
+
+  async function scheduleQuest() {
+    if (!scheduleAt) return
+    setScheduling(true)
+    try {
+      const { error } = await supabase.functions.invoke('drop-quest', {
+        body: {
+          action: 'schedule',
+          quest_id: scheduleQuestId || null,
+          scheduled_at: new Date(scheduleAt).toISOString(),
+          label: scheduleLabel || null,
+        },
+      })
+      if (error) { alert('Schedule failed: ' + error.message); return }
+      setScheduleAt('')
+      setScheduleLabel('')
+      setScheduleQuestId('')
+      await fetchData()
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  async function cancelSchedule(id) {
+    setCancellingId(id)
+    try {
+      await supabase.functions.invoke('drop-quest', { body: { action: 'cancel', id } })
+      await fetchData()
+    } finally {
+      setCancellingId(null)
+    }
   }
 
   async function seedSessions(userId) {
@@ -239,6 +278,87 @@ export default function Admin() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Quest Schedule */}
+      <section className="mb-8">
+        <h2 className="text-gold font-mono text-xs tracking-widest uppercase mb-3">Scheduled Drops</h2>
+
+        {/* Schedule form */}
+        <div className="bg-paper/5 border border-paper/10 rounded-xl p-4 mb-3 flex flex-col gap-3">
+          <div className="flex gap-2">
+            <input
+              type="datetime-local"
+              value={scheduleAt}
+              onChange={e => setScheduleAt(e.target.value)}
+              className="flex-1 bg-paper/5 border border-paper/20 text-paper text-xs font-mono px-3 py-2 rounded outline-none"
+            />
+            <select
+              value={scheduleQuestId}
+              onChange={e => setScheduleQuestId(e.target.value)}
+              className="flex-1 bg-paper/5 border border-paper/20 text-paper text-xs font-mono px-3 py-2 rounded outline-none"
+            >
+              <option value="">Random quest</option>
+              {quests.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Label (optional, e.g. Monday evening)"
+              value={scheduleLabel}
+              onChange={e => setScheduleLabel(e.target.value)}
+              className="flex-1 bg-paper/5 border border-paper/20 text-paper text-xs font-mono px-3 py-2 rounded outline-none placeholder-paper/25"
+            />
+            <button
+              onClick={scheduleQuest}
+              disabled={scheduling || !scheduleAt}
+              className="bg-gold text-dark text-xs font-mono px-4 py-2 tracking-widest uppercase disabled:opacity-50 whitespace-nowrap"
+            >
+              {scheduling ? 'Scheduling…' : 'Schedule'}
+            </button>
+          </div>
+        </div>
+
+        {/* Scheduled list */}
+        {schedule.length === 0 ? (
+          <p className="text-paper/30 text-xs font-mono">No scheduled drops.</p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {schedule.map(s => {
+              const isPast = new Date(s.scheduled_at) < new Date()
+              return (
+                <div key={s.id} className={`flex items-center gap-3 p-3 rounded-lg border ${s.executed ? 'border-paper/5 opacity-40' : isPast ? 'border-rust/40 bg-rust/5' : 'border-paper/10 bg-paper/5'}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-paper text-xs font-mono">
+                      {new Date(s.scheduled_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {s.label && <span className="text-paper/50 ml-2">— {s.label}</span>}
+                    </p>
+                    <p className="text-paper/40 text-xs mt-0.5">{s.quest?.title ?? 'Random quest'}</p>
+                  </div>
+                  {s.executed ? (
+                    <span className="text-green-400 text-xs font-mono">✓ fired</span>
+                  ) : isPast ? (
+                    <span className="text-rust text-xs font-mono animate-pulse">overdue</span>
+                  ) : null}
+                  {!s.executed && (
+                    <button
+                      onClick={() => cancelSchedule(s.id)}
+                      disabled={cancellingId === s.id}
+                      className="text-paper/30 text-xs font-mono border border-paper/10 px-2 py-0.5 hover:border-rust hover:text-rust transition-colors"
+                    >
+                      {cancellingId === s.id ? '…' : 'Cancel'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <p className="text-paper/20 text-xs font-mono mt-3">
+          Auto-execution requires a Supabase Cron Job calling <span className="text-paper/40">drop-quest</span> with <span className="text-paper/40">{`{"action":"cron"}`}</span> on a schedule.
+        </p>
       </section>
 
       {/* Users table */}
