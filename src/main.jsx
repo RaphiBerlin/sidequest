@@ -12,6 +12,7 @@ import QuestDrop from './screens/QuestDrop'
 import Nearby from './screens/Nearby'
 import Memory from './screens/Memory'
 import Journal from './screens/Journal'
+import Feed from './screens/Feed'
 import Friends from './screens/Friends'
 import ActiveQuest from './screens/ActiveQuest'
 import Admin from './screens/Admin'
@@ -73,7 +74,7 @@ function OfflineBanner() {
 
 function AppShell({ children }) {
   const location = useLocation()
-  const showTabBar = ['/home', '/journal', '/friends'].includes(location.pathname)
+  const showTabBar = ['/home', '/feed', '/journal', '/friends'].includes(location.pathname)
   return (
     <>
       <OfflineBanner />
@@ -141,6 +142,14 @@ createRoot(document.getElementById('root')).render(
               element={
                 <ProtectedRoute>
                   <Journal />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/feed"
+              element={
+                <ProtectedRoute>
+                  <Feed />
                 </ProtectedRoute>
               }
             />

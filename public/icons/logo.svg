@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="3840" height="3840">
+  <defs>
+    <!-- Main copper body gradient -->
+    <linearGradient id="copperMain" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#d4784a"/>
+      <stop offset="20%"  stop-color="#c0622f"/>
+      <stop offset="50%"  stop-color="#a04820"/>
+      <stop offset="80%"  stop-color="#8b3a16"/>
+      <stop offset="100%" stop-color="#6b2a0e"/>
+    </linearGradient>
+
+    <!-- Highlight streak across the middle -->
+    <linearGradient id="copperHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#e8905a" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#f0a878" stop-opacity="0.6"/>
+      <stop offset="50%"  stop-color="#f5b88a" stop-opacity="0.8"/>
+      <stop offset="70%"  stop-color="#e8905a" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#c06030" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Dark outline gradient -->
+    <linearGradient id="outlineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#5a1e08"/>
+      <stop offset="100%" stop-color="#3a0e04"/>
+    </linearGradient>
+
+    <!-- Inner shadow on bottom of each curve -->
+    <linearGradient id="innerShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- Bevel gradient for 3D edge -->
+    <linearGradient id="bevelTop" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#e89060"/>
+      <stop offset="100%" stop-color="#b05028"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="4" dy="8" stdDeviation="12" flood-color="#3a0e04" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Drop shadow layer (slightly offset, darker) -->
+  <g filter="url(#shadow)">
+
+    <!-- ══════════════════════════════════════
+         OUTER DARK STROKE — gives 3D depth
+         ══════════════════════════════════════ -->
+
+    <!-- Top curve outer (dark) -->
+    <path
+      d="M 485 120
+         C 560 120, 640 160, 640 240
+         C 640 310, 580 350, 510 370
+         L 400 400
+         C 320 425, 240 460, 220 540
+         C 200 620, 260 680, 340 690
+         L 340 690
+         L 290 720
+         L 200 680
+         L 215 580
+         C 220 490, 310 450, 390 420
+         L 500 390
+         C 575 365, 605 325, 605 260
+         C 605 185, 545 155, 475 155
+         L 350 155
+         L 390 120
+         Z"
+      fill="url(#outlineGrad)"
+      stroke="#3a0e04"
+      stroke-width="2"
+    />
+
+    <!-- Bottom curve outer (dark) -->
+    <path
+      d="M 315 680
+         C 240 680, 160 640, 160 560
+         C 160 490, 220 450, 290 430
+         L 400 400
+         C 480 375, 560 340, 580 260
+         C 600 180, 540 120, 460 110
+         L 460 110
+         L 510 80
+         L 600 120
+         L 585 220
+         C 580 310, 490 350, 410 380
+         L 300 410
+         C 225 435, 195 475, 195 540
+         C 195 615, 255 645, 325 645
+         L 450 645
+         L 410 680
+         Z"
+      fill="url(#outlineGrad)"
+      stroke="#3a0e04"
+      stroke-width="2"
+    />
+
+  </g>
+
+  <!-- ══════════════════════════════════════
+       MAIN COPPER BODY
+       ══════════════════════════════════════ -->
+
+  <!-- Top S curve — copper fill -->
+  <path
+    d="M 490 135
+       C 558 135, 622 172, 622 248
+       C 622 316, 566 352, 498 372
+       L 394 402
+       C 314 428, 238 464, 218 542
+       C 198 617, 256 672, 334 678
+       L 316 660
+       C 256 654, 212 614, 228 548
+       C 244 480, 314 446, 390 422
+       L 494 392
+       C 566 370, 604 330, 604 258
+       C 604 186, 548 152, 476 152
+       L 358 152
+       L 374 135
+       Z"
+    fill="url(#copperMain)"
+  />
+
+  <!-- Bottom S curve — copper fill -->
+  <path
+    d="M 310 665
+       C 242 665, 178 628, 178 552
+       C 178 484, 234 448, 302 428
+       L 406 398
+       C 486 372, 562 336, 582 258
+       C 602 183, 544 128, 466 122
+       L 484 140
+       C 544 146, 588 186, 572 252
+       C 556 320, 486 354, 410 378
+       L 306 408
+       C 234 430, 196 470, 196 542
+       C 196 614, 252 648, 324 648
+       L 442 648
+       L 426 665
+       Z"
+    fill="url(#copperMain)"
+  />
+
+  <!-- Highlight sheen over the whole S -->
+  <path
+    d="M 490 135
+       C 558 135, 622 172, 622 248
+       C 622 316, 566 352, 498 372
+       L 394 402
+       C 314 428, 238 464, 218 542
+       C 198 617, 256 672, 334 678
+       L 316 660
+       C 256 654, 212 614, 228 548
+       C 244 480, 314 446, 390 422
+       L 494 392
+       C 566 370, 604 330, 604 258
+       C 604 186, 548 152, 476 152
+       L 358 152
+       L 374 135
+       Z"
+    fill="url(#copperHighlight)"
+    opacity="0.7"
+  />
+
+  <!-- ══════════════════════════════════════
+       ARROWHEAD — TOP RIGHT (pointing right)
+       ══════════════════════════════════════ -->
+  <polygon
+    points="645,200  545,145  545,165  490,165  490,235  545,235  545,255"
+    fill="url(#copperMain)"
+    stroke="#5a1e08"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+  <!-- Arrowhead highlight -->
+  <polygon
+    points="645,200  545,145  545,165  490,165  490,200  545,200  545,165"
+    fill="url(#bevelTop)"
+    opacity="0.5"
+  />
+
+  <!-- ══════════════════════════════════════
+       ARROWHEAD — BOTTOM LEFT (pointing left)
+       ══════════════════════════════════════ -->
+  <polygon
+    points="155,600  255,545  255,565  310,565  310,635  255,635  255,655"
+    fill="url(#copperMain)"
+    stroke="#5a1e08"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+  <!-- Arrowhead highlight -->
+  <polygon
+    points="155,600  255,545  255,565  310,565  310,600  255,600  255,565"
+    fill="url(#bevelTop)"
+    opacity="0.5"
+  />
+
+  <!-- ══════════════════════════════════════
+       EDGE HIGHLIGHTS (top rim of 3D bevel)
+       ══════════════════════════════════════ -->
+  <!-- Top edge of upper curve -->
+  <path
+    d="M 374 135 C 420 132, 510 134, 560 155 C 600 172, 622 205, 622 248"
+    fill="none"
+    stroke="#e8a070"
+    stroke-width="4"
+    stroke-linecap="round"
+    opacity="0.7"
+  />
+  <!-- Bottom edge of lower curve -->
+  <path
+    d="M 426 665 C 380 668, 290 666, 240 645 C 200 628, 178 595, 178 552"
+    fill="none"
+    stroke="#e8a070"
+    stroke-width="4"
+    stroke-linecap="round"
+    opacity="0.7"
+  />
+
+</svg>

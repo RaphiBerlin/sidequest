@@ -44,12 +44,13 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-6">
-      <h1
-        className="italic text-rust mb-12 select-none"
-        style={{ fontFamily: "'Fraunces', serif", fontSize: 'clamp(2.5rem, 10vw, 6rem)' }}
-      >
-        sidequest
-      </h1>
+      <img
+        src="/icons/icon-1024.png"
+        alt="Sidequest"
+        className="mb-10 select-none"
+        style={{ width: 'clamp(120px, 40vw, 220px)', height: 'auto' }}
+        draggable={false}
+      />
 
       {step === 'email' ? (
         <form onSubmit={sendOtp} className="w-full max-w-sm flex flex-col gap-4">

@@ -60,5 +60,11 @@ export async function completeSession({ sessionId, userId, mainPhoto, pipPhoto, 
 
   if (updateError) console.error('completeSession update failed:', updateError)
 
+  // Increment streak: add 1 if last quest was yesterday or earlier today,
+  // reset to 1 if more than 2 days since last quest (missed a day).
+  // We use a DB function so the logic is atomic and timezone-safe.
+  const { error: streakError } = await supabase.rpc('increment_streak', { uid: userId })
+  if (streakError) console.error('streak increment failed:', streakError)
+
   return { mainUrl, pipUrl }
 }

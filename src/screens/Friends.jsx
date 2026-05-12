@@ -51,6 +51,10 @@ export default function Friends() {
   const [contactMatches, setContactMatches] = useState([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [contactsScanned, setContactsScanned] = useState(false)
+  const [nameSearch, setNameSearch] = useState('')
+  const [nameResults, setNameResults] = useState([])
+  const [nameSearching, setNameSearching] = useState(false)
+  const [questCounts, setQuestCounts] = useState({})
 
   async function fetchFriendships() {
     if (!user) return
@@ -82,6 +86,19 @@ export default function Friends() {
     setPendingRequests(pending)
     setAcceptedFriends(accepted)
     setLoading(false)
+
+    // Fetch quest counts for accepted friends
+    const friendIds = accepted.map(f => f.id)
+    if (friendIds.length > 0) {
+      const { data: sessions } = await supabase
+        .from('quest_sessions')
+        .select('user_id')
+        .in('user_id', friendIds)
+        .not('completed_at', 'is', null)
+      const counts = {}
+      sessions?.forEach(s => { counts[s.user_id] = (counts[s.user_id] || 0) + 1 })
+      setQuestCounts(counts)
+    }
   }
 
   useEffect(() => {
@@ -136,6 +153,20 @@ export default function Friends() {
     setContactsLoading(false)
   }
 
+  async function searchByName() {
+    if (!nameSearch.trim()) return
+    setNameSearching(true)
+    const { data } = await supabase.rpc('search_users', { query: nameSearch.trim() })
+    setNameResults(data || [])
+    setNameSearching(false)
+  }
+
+  async function sendRequest(friendId) {
+    await supabase.from('friendships').insert({ user_id: user.id, friend_id: friendId, status: 'pending' })
+    setNameResults(prev => prev.filter(u => u.id !== friendId))
+    showToast('Friend request sent!', 'success')
+  }
+
   async function addFromContacts(userId) {
     await supabase.from('friendships').insert({
       user_id: user.id,
@@ -182,6 +213,56 @@ export default function Friends() {
         value={search}
         onChange={e => setSearch(e.target.value)}
       />
+
+      {/* Search by name */}
+      <div className="mx-5 mb-4 flex gap-2" style={{ width: 'calc(100% - 40px)' }}>
+        <input
+          placeholder="Find someone by name…"
+          className="flex-1 bg-dark/5 rounded-lg px-4 py-2 text-dark/70 text-sm outline-none"
+          value={nameSearch}
+          onChange={e => setNameSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && searchByName()}
+        />
+        <button
+          onClick={searchByName}
+          disabled={nameSearching || !nameSearch.trim()}
+          className="px-3 py-2 rounded-lg text-paper text-sm font-medium disabled:opacity-40 flex-shrink-0"
+          style={{ backgroundColor: '#c44829', fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {nameSearching ? '…' : 'Find'}
+        </button>
+      </div>
+
+      {/* Name search results */}
+      {nameResults.length > 0 && (
+        <div className="mb-4">
+          <p className="px-5 text-dark/40 text-xs tracking-widest uppercase mb-2"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            Results
+          </p>
+          {nameResults.map(u => (
+            <div key={u.id} className="mx-5 my-1 px-4 py-3 rounded-xl bg-white border border-dark/5 flex items-center gap-3">
+              <AvatarCircle name={u.name} avatarColor={u.avatar_color} />
+              <div className="flex-1 min-w-0">
+                <p className="text-dark font-medium truncate">{u.name}</p>
+              </div>
+              <button
+                onClick={() => sendRequest(u.id)}
+                className="text-xs px-3 py-1.5 rounded-lg text-paper font-medium flex-shrink-0"
+                style={{ backgroundColor: '#c44829', fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                Add
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {nameSearch && nameResults.length === 0 && !nameSearching && (
+        <p className="px-5 mb-4 text-dark/30 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          No users found for "{nameSearch}".
+        </p>
+      )}
 
       {/* Find from contacts */}
       {!contactsScanned && (
@@ -358,10 +439,10 @@ export default function Friends() {
               </p>
             </div>
             <span
-              className="text-[10px] tracking-widest text-dark/40 flex-shrink-0"
+              className="text-[10px] tracking-widest text-dark/40 flex-shrink-0 text-right leading-tight"
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              FRIEND
+              {questCounts[friend.id] ? `${questCounts[friend.id]} quests` : 'FRIEND'}
             </span>
           </div>
         ))

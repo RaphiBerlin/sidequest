@@ -7,9 +7,20 @@ export default function TabBar() {
   const [bouncing, setBouncing] = useState(null)
 
   const tabs = [
-    { label: 'HOME', icon: '◯', path: '/home' },
-    { label: 'JOURNAL', icon: '▤', path: '/journal' },
-    { label: 'FRIENDS', icon: '◎', path: '/friends' },
+    {
+      label: 'HOME',
+      icon: (active) => (
+        <img
+          src="/icons/icon-1024.png"
+          alt="Home"
+          style={{ width: 60, height: 60, objectFit: 'contain', opacity: active ? 1 : 0.45, marginTop: -16, marginBottom: -16 }}
+          draggable={false}
+        />
+      ),
+      path: '/home',
+    },
+    { label: 'FEED', icon: () => '◎', path: '/feed' },
+    { label: 'JOURNAL', icon: () => '▤', path: '/journal' },
   ]
 
   return (
@@ -35,7 +46,12 @@ export default function TabBar() {
               className="flex flex-col items-center py-3 px-6 cursor-pointer"
               style={{ color: isActive ? '#d4a02a' : 'rgba(244, 237, 224, 0.4)' }}
             >
-              <span className={`text-xl${bouncing === tab.path ? ' animate-tab-bounce' : ''}`}>{tab.icon}</span>
+              <span
+                className={`flex items-center justify-center${bouncing === tab.path ? ' animate-tab-bounce' : ''}`}
+                style={{ height: 28, fontSize: '1.25rem' }}
+              >
+                {tab.icon(isActive)}
+              </span>
               <span
                 className="text-[10px] tracking-widest uppercase mt-0.5"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}

@@ -17,6 +17,7 @@ export default function Settings() {
   )
   const [showInstallModal, setShowInstallModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [usingFreeze, setUsingFreeze] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -50,8 +51,18 @@ export default function Settings() {
     navigate('/')
   }
 
+  async function useFreeze() {
+    setUsingFreeze(true)
+    await supabase.from('users').update({ last_freeze_used_at: new Date().toISOString() }).eq('id', user.id)
+    setProfile(prev => ({ ...prev, last_freeze_used_at: new Date().toISOString() }))
+    setUsingFreeze(false)
+    showToast('Streak frozen for 24h ❄️', 'success')
+  }
+
   async function handleDeleteAccount() {
-    await supabase.from('users').delete().eq('id', user.id)
+    // Delete user data — cascade handles quest_sessions, friendships, etc.
+    // Then call RPC to remove auth record so the email can be re-used
+    await supabase.rpc('delete_account')
     await signOut()
     navigate('/')
   }
@@ -112,12 +123,43 @@ export default function Settings() {
               {freezeAvailable ? 'Freeze available' : `Freeze resets ${freezeDate?.toLocaleDateString()}`}
             </p>
           </div>
-          {freezeAvailable && <span className="text-xs font-mono border border-dark/20 text-dark/40 px-2 py-0.5 rounded-full">FREEZE READY</span>}
+          {freezeAvailable && (
+            <button
+              onClick={useFreeze}
+              disabled={usingFreeze}
+              className="text-xs font-mono border border-blue-300 text-blue-400 px-3 py-1.5 rounded-full hover:bg-blue-50 transition-colors disabled:opacity-40"
+            >
+              {usingFreeze ? '…' : '❄️ Use freeze'}
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Friends */}
+      <section className="px-5 mb-6">
+        <p className="text-dark/40 text-xs font-mono tracking-widest uppercase mb-3">Friends</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-dark/5 overflow-hidden">
+          <button
+            onClick={() => navigate('/friends')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-dark/5 transition-colors"
+          >
+            <span className="text-dark text-sm">My friends</span>
+            <span className="text-dark/30 text-sm">→</span>
+          </button>
+          <div className="border-t border-dark/5">
+            <button
+              onClick={copyInviteLink}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-dark/5 transition-colors"
+            >
+              <span className="text-dark text-sm">Invite a friend</span>
+              <span className="text-dark/30 text-sm">↗</span>
+            </button>
+          </div>
         </div>
       </section>
 
       {/* Invite section */}
-      <section className="px-5 mb-6">
+      <section className="px-5 mb-6" style={{ display: 'none' }}>
         <p className="text-dark/40 text-xs font-mono tracking-widest uppercase mb-3">Invite Friends</p>
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-dark/5">
           <p className="text-dark/60 text-sm mb-3">Share your personal invite link</p>

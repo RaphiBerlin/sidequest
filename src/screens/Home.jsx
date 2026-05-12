@@ -7,11 +7,9 @@ import { usePushSubscription } from '../hooks/usePushSubscription'
 import { supabase } from '../lib/supabase'
 import { cacheGet, cacheSet } from '../lib/cache'
 import { getLocationContext } from '../lib/locationContext'
-import FeedCard from '../components/FeedCard'
-
 export default function Home() {
   const navigate = useNavigate()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const { activeQuest, loading: questLoading, newDrop, clearNewDrop } = useQuestDrop()
   const { location, locationError, locationLoading, requestLocation } = useLocation()
   const [profile, setProfile] = useState(null)
@@ -20,11 +18,10 @@ export default function Home() {
   const [freezeReady, setFreezeReady] = useState(false)
   const [dropping, setDropping] = useState(false)
   const [locationLabel, setLocationLabel] = useState(null)
-  const [feed, setFeed] = useState([])
-  const [feedLoading, setFeedLoading] = useState(true)
   const [notifPermission, setNotifPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'denied'
   )
+  const [nextDrop, setNextDrop] = useState(null)
 
   usePushSubscription(user?.id)
 
@@ -60,7 +57,14 @@ export default function Home() {
       .limit(8)
       .then(({ data }) => setRecentSessions(data || []))
 
-    fetchFeed()
+    supabase.from('quest_schedule')
+      .select('scheduled_at')
+      .eq('executed', false)
+      .gte('scheduled_at', new Date().toISOString())
+      .order('scheduled_at', { ascending: true })
+      .limit(1)
+      .single()
+      .then(({ data }) => { if (data) setNextDrop(data.scheduled_at) })
   }, [user])
 
   useEffect(() => {
@@ -75,38 +79,6 @@ export default function Home() {
     const timer = setTimeout(() => clearNewDrop(), 6000)
     return () => clearTimeout(timer)
   }, [newDrop])
-
-  async function fetchFeed() {
-    if (!user) return
-    try {
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', user.id)
-        .eq('status', 'accepted')
-
-      const friendIds = friendships?.map(f => f.friend_id) || []
-      if (friendIds.length === 0) {
-        setFeed([])
-        setFeedLoading(false)
-        return
-      }
-
-      const { data } = await supabase
-        .from('quest_sessions')
-        .select('id, completed_at, photo_url, user:users(id, name), quest:quests(title), reactions(emoji, user_id)')
-        .in('user_id', friendIds)
-        .not('completed_at', 'is', null)
-        .order('completed_at', { ascending: false })
-        .limit(20)
-
-      setFeed(data || [])
-    } catch (e) {
-      console.error('feed error', e)
-    } finally {
-      setFeedLoading(false)
-    }
-  }
 
   async function enablePushAlerts() {
     if (typeof Notification === 'undefined') return
@@ -127,6 +99,18 @@ export default function Home() {
       console.error(e)
     }
     setDropping(false)
+  }
+
+  function formatNextDrop(dateStr) {
+    if (!dateStr) return null
+    const d = new Date(dateStr)
+    const diff = d - Date.now()
+    if (diff <= 0) return 'soon'
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `in ${mins}m`
+    const hours = Math.floor(diff / 3600000)
+    if (hours < 24) return `in ${hours}h`
+    return d.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })
   }
 
   const initial = user?.email?.[0]?.toUpperCase() ?? '?'
@@ -230,7 +214,9 @@ export default function Home() {
           <div className="bg-paper/5 border border-paper/10 rounded-xl p-4 flex items-center justify-between">
             <div>
               <p className="text-paper/50 italic text-sm" style={{ fontFamily: "'Fraunces', serif" }}>No quest active right now.</p>
-              <p className="text-paper/20 text-xs font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Next drop: today</p>
+              <p className="text-paper/20 text-xs font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {nextDrop ? `Next drop: ${formatNextDrop(nextDrop)}` : 'No drops scheduled'}
+              </p>
             </div>
             <button
               onClick={simulateDrop}
@@ -278,37 +264,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Friend activity feed */}
-      <div className="px-5">
-        <p className="text-paper/40 text-xs tracking-widest uppercase mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          Friends' quests
-        </p>
-        {feedLoading ? (
-          <div className="flex flex-col gap-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-paper/5 border border-paper/10 rounded-2xl overflow-hidden animate-pulse">
-                <div className="h-40 bg-paper/10" />
-                <div className="p-3 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-paper/10" />
-                  <div className="flex-1">
-                    <div className="h-3 bg-paper/10 rounded w-24 mb-1" />
-                    <div className="h-2 bg-paper/10 rounded w-32" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : feed.length === 0 ? (
-          <div className="text-center py-8 border border-paper/10 rounded-xl bg-paper/5">
-            <p className="text-paper/40 italic text-base mb-1" style={{ fontFamily: "'Fraunces', serif" }}>No activity yet.</p>
-            <p className="text-paper/20 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Add friends to see their quests here.</p>
-          </div>
-        ) : (
-          feed.map(session => (
-            <FeedCard key={session.id} session={session} currentUserId={user?.id} />
-          ))
-        )}
-      </div>
     </div>
   )
 }
