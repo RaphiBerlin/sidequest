@@ -36,7 +36,7 @@ export default function Nearby() {
   const [invited, setInvited] = useState(new Set())
   const [lastUpdated, setLastUpdated] = useState(null)
   const [secsAgo, setSecsAgo] = useState(null)
-  const intervalRef = useRef(null)
+  const presenceChannelRef = useRef(null)
   const timerRef = useRef(null)
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
@@ -67,9 +67,16 @@ export default function Nearby() {
     // Write presence on mount
     writePresence(user.id).catch(e => console.error('writePresence error', e))
 
-    // Initial fetch + 30s refresh
+    // Initial fetch
     fetchNearby()
-    intervalRef.current = setInterval(fetchNearby, 30000)
+
+    // Subscribe to presence changes — refetch whenever anyone's location updates
+    presenceChannelRef.current = supabase
+      .channel('nearby-presence')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'presence' }, () => {
+        fetchNearby()
+      })
+      .subscribe()
 
     // Live "X seconds ago" ticker
     timerRef.current = setInterval(() => {
@@ -78,7 +85,7 @@ export default function Nearby() {
 
     return () => {
       deletePresence(user.id).catch(e => console.error('deletePresence error', e))
-      clearInterval(intervalRef.current)
+      if (presenceChannelRef.current) supabase.removeChannel(presenceChannelRef.current)
       clearInterval(timerRef.current)
     }
   }, [location, user])

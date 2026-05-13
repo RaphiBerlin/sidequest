@@ -131,8 +131,9 @@ Deno.serve(async (req) => {
   const response = Response.json({ success: true, quest_id: picked.id });
 
   // Fire push notification (non-blocking)
+  const triggeredBy = body.action === "cron" ? "cron" : body.quest_id ? "manual" : "quest_drop";
   supabase.functions.invoke("send-push", {
-    body: { title: "🔥 Quest dropped!", body: questTitle, url: "/quest-drop" },
+    body: { title: "🔥 Quest dropped!", body: questTitle, url: "/quest-drop", triggered_by: triggeredBy },
   }).catch(() => {});
 
   return response;

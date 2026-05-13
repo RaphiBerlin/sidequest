@@ -23,3 +23,9 @@ supabase/.temp
 
 # VAPID private key (add to Supabase secrets manually)
 .vapid-private
+
+# Playwright
+playwright-report/
+test-results/
+tests/e2e/.auth/user.json
+tests/e2e/.env.test
