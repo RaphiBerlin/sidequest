@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#d4784a"/>
+      <stop offset="40%"  stop-color="#c0622f"/>
+      <stop offset="100%" stop-color="#7a3010"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="100" height="100" rx="22" fill="#1a1612"/>
+
+  <!-- Italic serif "s" — Georgia italic renders very close to Fraunces at small sizes -->
+  <text
+    x="50"
+    y="76"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-style="italic"
+    font-weight="700"
+    font-size="88"
+    fill="url(#copper)"
+  >s</text>
+</svg>
