@@ -15,7 +15,12 @@ import Journal from './screens/Journal'
 import Feed from './screens/Feed'
 import Friends from './screens/Friends'
 import ActiveQuest from './screens/ActiveQuest'
-import Admin from './screens/Admin'
+import AdminLayout from './screens/admin/AdminLayout'
+import AdminHome from './screens/admin/AdminHome'
+import AdminQuests from './screens/admin/AdminQuests'
+import AdminUsers from './screens/admin/AdminUsers'
+import AdminLogs from './screens/admin/AdminLogs'
+import AdminModeration from './screens/admin/AdminModeration'
 import Settings from './screens/Settings'
 import ProtectedRoute from './components/ProtectedRoute'
 import InstallBanner from './components/InstallBanner'
@@ -169,7 +174,13 @@ createRoot(document.getElementById('root')).render(
                 </ProtectedRoute>
               }
             />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminHome />} />
+              <Route path="quests" element={<AdminQuests />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="logs" element={<AdminLogs />} />
+              <Route path="moderation" element={<AdminModeration />} />
+            </Route>
             <Route
               path="/settings"
               element={

@@ -141,7 +141,7 @@ export default function Journal() {
         ) : sessions.length === 0 ? (
           <div className="text-center py-16">
             <p className="italic text-dark/40 text-xl mb-4" style={{ fontFamily: "'Fraunces', serif" }}>
-              Your journal is empty. Complete a quest to start your archive.
+              No memories yet. Your first quest is out there.
             </p>
             <button
               onClick={() => navigate('/home')}

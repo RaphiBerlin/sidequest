@@ -1,30 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { getInviteLink } from '../lib/invites'
 import { useToast } from '../context/ToastContext'
 import Skeleton from '../components/Skeleton'
+import Avatar from '../components/Avatar'
 import { contactsSupported, getContactPhones, hashContactPhones } from '../lib/contacts'
-
-function AvatarCircle({ name, avatarColor, size = 48 }) {
-  const initial = (name || '?')[0].toUpperCase()
-  return (
-    <div
-      className="flex-shrink-0 rounded-full flex items-center justify-center font-bold"
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: avatarColor || '#c44829',
-        color: '#f4ede0',
-        fontSize: size * 0.4,
-        fontFamily: "'Fraunces', serif",
-      }}
-    >
-      {initial}
-    </div>
-  )
-}
 
 function SkeletonFriendCard() {
   return (
@@ -55,6 +37,7 @@ export default function Friends() {
   const [nameResults, setNameResults] = useState([])
   const [nameSearching, setNameSearching] = useState(false)
   const [questCounts, setQuestCounts] = useState({})
+  const channelRef = useRef(null)
 
   async function fetchFriendships() {
     if (!user) return
@@ -62,8 +45,8 @@ export default function Friends() {
       .from('friendships')
       .select(`
         id, status, tier, user_id, friend_id,
-        requester:users!friendships_user_id_fkey(id, name, avatar_color),
-        recipient:users!friendships_friend_id_fkey(id, name, avatar_color)
+        requester:users!friendships_user_id_fkey(id, name, avatar_color, avatar_url),
+        recipient:users!friendships_friend_id_fkey(id, name, avatar_color, avatar_url)
       `)
       .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
 
@@ -102,7 +85,56 @@ export default function Friends() {
   }
 
   useEffect(() => {
+    if (!user) return
     fetchFriendships()
+
+    // Incoming friend request (someone sent you one)
+    const incomingChannel = supabase
+      .channel('friendships-incoming')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'friendships',
+        filter: `friend_id=eq.${user.id}`,
+      }, async (payload) => {
+        if (payload.new.status !== 'pending') return
+        // Fetch full row with requester details
+        const { data } = await supabase
+          .from('friendships')
+          .select('id, status, tier, user_id, friend_id, requester:users!friendships_user_id_fkey(id, name, avatar_color, avatar_url), recipient:users!friendships_friend_id_fkey(id, name, avatar_color, avatar_url)')
+          .eq('id', payload.new.id)
+          .single()
+        if (data) setPendingRequests(prev => {
+          if (prev.find(f => f.id === data.id)) return prev
+          return [...prev, data]
+        })
+      })
+      // Someone accepted a request you sent (you are user_id, status → accepted)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'friendships',
+        filter: `user_id=eq.${user.id}`,
+      }, async (payload) => {
+        if (payload.new.status !== 'accepted' || payload.old.status === 'accepted') return
+        // Fetch with user details and move to accepted list
+        const { data } = await supabase
+          .from('friendships')
+          .select('id, status, tier, user_id, friend_id, requester:users!friendships_user_id_fkey(id, name, avatar_color, avatar_url), recipient:users!friendships_friend_id_fkey(id, name, avatar_color, avatar_url)')
+          .eq('id', payload.new.id)
+          .single()
+        if (!data) return
+        const other = data.recipient
+        setAcceptedFriends(prev => {
+          if (prev.find(f => f.friendshipId === data.id)) return prev
+          return [...prev, { friendshipId: data.id, ...other }]
+        })
+        showToast(`${other?.name ?? 'Someone'} accepted your friend request!`, 'success')
+      })
+      .subscribe()
+
+    channelRef.current = incomingChannel
+    return () => supabase.removeChannel(incomingChannel)
   }, [user])
 
   async function handleAccept(friendshipId) {
@@ -242,7 +274,7 @@ export default function Friends() {
           </p>
           {nameResults.map(u => (
             <div key={u.id} className="mx-5 my-1 px-4 py-3 rounded-xl bg-white border border-dark/5 flex items-center gap-3">
-              <AvatarCircle name={u.name} avatarColor={u.avatar_color} />
+              <Avatar src={u.avatar_url} name={u.name} color={u.avatar_color} size={48} />
               <div className="flex-1 min-w-0">
                 <p className="text-dark font-medium truncate">{u.name}</p>
               </div>
@@ -304,7 +336,7 @@ export default function Friends() {
               key={match.user_id}
               className="mx-5 my-1 px-4 py-3 rounded-xl bg-white border border-dark/5 flex items-center gap-3"
             >
-              <AvatarCircle name={match.name} avatarColor={match.avatar_color} />
+              <Avatar src={match.avatar_url} name={match.name} color={match.avatar_color} size={48} />
               <div className="flex-1 min-w-0">
                 <p className="text-dark font-medium truncate">{match.name}</p>
                 <p className="text-dark/40 text-xs truncate"
@@ -349,9 +381,11 @@ export default function Friends() {
                 key={req.id}
                 className="mx-5 my-1 px-4 py-3 rounded-xl bg-white border border-dark/5 flex items-center gap-3"
               >
-                <AvatarCircle
+                <Avatar
+                  src={requester?.avatar_url}
                   name={requester?.name}
-                  avatarColor={requester?.avatar_color}
+                  color={requester?.avatar_color}
+                  size={48}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-dark font-medium truncate">
@@ -402,7 +436,7 @@ export default function Friends() {
               color: 'rgba(196, 72, 41, 0.6)',
             }}
           >
-            No friends yet.{'\n'}Complete a quest near someone to connect.
+            Nobody here yet. Send a link and change that.
           </p>
           <button
             onClick={() => navigate('/nearby')}
@@ -432,7 +466,7 @@ export default function Friends() {
             key={friend.friendshipId}
             className="mx-5 my-1 px-4 py-3 rounded-xl bg-paper border border-dark/5 flex items-center gap-3"
           >
-            <AvatarCircle name={friend.name} avatarColor={friend.avatar_color} />
+            <Avatar src={friend.avatar_url} name={friend.name} color={friend.avatar_color} size={48} />
             <div className="flex-1 min-w-0">
               <p className="text-dark font-medium truncate">
                 {friend.name || 'Unknown'}
