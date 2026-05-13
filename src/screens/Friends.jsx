@@ -138,10 +138,21 @@ export default function Friends() {
   }, [user])
 
   async function handleAccept(friendshipId) {
-    await supabase
+    const { data: friendship } = await supabase
       .from('friendships')
       .update({ status: 'accepted' })
       .eq('id', friendshipId)
+      .select('user_id')
+      .single()
+    // Notify the original requester that you accepted
+    if (friendship?.user_id) {
+      await supabase.from('notifications').insert({
+        user_id: friendship.user_id,
+        type: 'friend_accepted',
+        from_user_id: user.id,
+        data: {},
+      })
+    }
     fetchFriendships()
   }
 
@@ -193,18 +204,32 @@ export default function Friends() {
     setNameSearching(false)
   }
 
+  async function sendFriendRequest(friendId) {
+    const { data: friendship } = await supabase
+      .from('friendships')
+      .insert({ user_id: user.id, friend_id: friendId, status: 'pending' })
+      .select('id')
+      .single()
+    // Notify the recipient
+    if (friendship?.id) {
+      await supabase.from('notifications').insert({
+        user_id: friendId,
+        type: 'friend_request',
+        from_user_id: user.id,
+        data: { friendship_id: friendship.id },
+      })
+    }
+    return friendship
+  }
+
   async function sendRequest(friendId) {
-    await supabase.from('friendships').insert({ user_id: user.id, friend_id: friendId, status: 'pending' })
+    await sendFriendRequest(friendId)
     setNameResults(prev => prev.filter(u => u.id !== friendId))
     showToast('Friend request sent!', 'success')
   }
 
   async function addFromContacts(userId) {
-    await supabase.from('friendships').insert({
-      user_id: user.id,
-      friend_id: userId,
-      status: 'pending',
-    })
+    await sendFriendRequest(userId)
     setContactMatches(prev => prev.filter(u => u.user_id !== userId))
     showToast('Friend request sent!', 'success')
   }

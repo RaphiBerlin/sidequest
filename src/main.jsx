@@ -22,11 +22,13 @@ import AdminUsers from './screens/admin/AdminUsers'
 import AdminLogs from './screens/admin/AdminLogs'
 import AdminModeration from './screens/admin/AdminModeration'
 import Settings from './screens/Settings'
+import Notifications from './screens/Notifications'
 import ProtectedRoute from './components/ProtectedRoute'
 import InstallBanner from './components/InstallBanner'
 import TabBar from './components/TabBar'
 import { AppStateProvider } from './context/AppState'
 import { ToastProvider } from './context/ToastContext'
+import { NotificationsProvider } from './context/NotificationsContext'
 import { useAuth } from './hooks/useAuth'
 import { usePartyInvites } from './hooks/usePartyInvites'
 import './index.css'
@@ -79,7 +81,7 @@ function OfflineBanner() {
 
 function AppShell({ children }) {
   const location = useLocation()
-  const showTabBar = ['/home', '/feed', '/journal', '/friends'].includes(location.pathname)
+  const showTabBar = ['/home', '/feed', '/journal', '/friends', '/notifications'].includes(location.pathname)
   return (
     <>
       <OfflineBanner />
@@ -96,6 +98,7 @@ createRoot(document.getElementById('root')).render(
       <ErrorBoundary>
         <ToastProvider>
           <AppStateProvider>
+            <NotificationsProvider>
             <AppShell>
             <InstallBanner />
           <Routes>
@@ -189,8 +192,17 @@ createRoot(document.getElementById('root')).render(
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <Notifications />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
             </AppShell>
+            </NotificationsProvider>
           </AppStateProvider>
         </ToastProvider>
       </ErrorBoundary>
