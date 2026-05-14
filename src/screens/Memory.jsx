@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { useReactions } from '../hooks/useReactions'
 import { completeSession } from '../lib/photos'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../context/ToastContext'
 import confetti from 'canvas-confetti'
 
-const EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
+const CAPTION_LIMIT = 150
 
 function formatElapsed(sec) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0')
@@ -111,6 +110,8 @@ export default function Memory() {
   const [pipUrl, setPipUrl] = useState(null)
   const [generatingCard, setGeneratingCard] = useState(false)
   const [isPublic, setIsPublic] = useState(false)
+  const [caption, setCaption] = useState('')
+  const [captionSaved, setCaptionSaved] = useState(false)
 
   // Animation state
   const [phase, setPhase] = useState('upload') // 'upload' | 'spin' | 'fly' | 'done'
@@ -118,8 +119,8 @@ export default function Memory() {
   const [cardVisible, setCardVisible] = useState(false)
 
   const { showToast } = useToast()
-  const { myReactions, toggleReaction, grouped } = useReactions(sessionId, user?.id)
   const cardRef = useRef(null)
+  const captionTimerRef = useRef(null)
   const now = new Date()
   const hasCompletedRef = useRef(false)
 
@@ -193,6 +194,20 @@ export default function Memory() {
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [uploading, !!mainPreview])
+
+  function handleCaptionChange(e) {
+    const val = e.target.value.slice(0, CAPTION_LIMIT)
+    setCaption(val)
+    setCaptionSaved(false)
+    clearTimeout(captionTimerRef.current)
+    captionTimerRef.current = setTimeout(() => saveCaption(val), 800)
+  }
+
+  async function saveCaption(text) {
+    if (!sessionId) return
+    await supabase.from('quest_sessions').update({ caption: text || null }).eq('id', sessionId)
+    setCaptionSaved(true)
+  }
 
   async function togglePublic() {
     const next = !isPublic
@@ -438,24 +453,25 @@ export default function Memory() {
             </div>
           ))}
 
-          {/* Reactions */}
-          <div className="flex gap-3 justify-center">
-            {EMOJIS.map(emoji => (
-              <button
-                key={emoji}
-                onClick={() => { toggleReaction(emoji); navigator.vibrate?.(30) }}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
-                  myReactions.has(emoji)
-                    ? 'bg-rust/10 border border-rust/30 scale-110'
-                    : 'bg-dark/5 border border-dark/10'
-                }`}
-              >
-                <span className="text-2xl">{emoji}</span>
-                {grouped[emoji] > 0 && (
-                  <span className="text-[10px] font-mono text-dark/50">{grouped[emoji]}</span>
-                )}
-              </button>
-            ))}
+          {/* Caption */}
+          <div className="bg-white rounded-xl border border-dark/5 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-dark/40 text-xs tracking-widest uppercase" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                Add a note
+              </p>
+              <p className="text-dark/25 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {captionSaved ? '✓ saved' : `${caption.length}/${CAPTION_LIMIT}`}
+              </p>
+            </div>
+            <textarea
+              value={caption}
+              onChange={handleCaptionChange}
+              onBlur={() => { clearTimeout(captionTimerRef.current); saveCaption(caption) }}
+              placeholder="What was this quest about for you?"
+              rows={3}
+              className="w-full bg-transparent text-dark text-sm leading-relaxed outline-none resize-none placeholder-dark/25"
+              style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
+            />
           </div>
 
           {/* Actions */}
