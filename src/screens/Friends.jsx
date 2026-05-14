@@ -6,7 +6,21 @@ import { getInviteLink } from '../lib/invites'
 import { useToast } from '../context/ToastContext'
 import Skeleton from '../components/Skeleton'
 import Avatar from '../components/Avatar'
-import { contactsSupported, getContactPhones, hashContactPhones } from '../lib/contacts'
+import { contactsSupported, getContactPhones, hashContactPhones, hashContactPhones as hashPhones } from '../lib/contacts'
+
+async function sha256hex(str) {
+  const data = new TextEncoder().encode(str)
+  const buf = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function normalizePhone(raw) {
+  const digits = String(raw).replace(/\D/g, '')
+  if (digits.length === 10) return '+1' + digits
+  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits
+  if (digits.length > 7) return '+' + digits
+  return null
+}
 
 function SkeletonFriendCard() {
   return (
@@ -36,6 +50,9 @@ export default function Friends() {
   const [nameSearch, setNameSearch] = useState('')
   const [nameResults, setNameResults] = useState([])
   const [nameSearching, setNameSearching] = useState(false)
+  const [phoneSearch, setPhoneSearch] = useState('')
+  const [phoneSearching, setPhoneSearching] = useState(false)
+  const [phoneResult, setPhoneResult] = useState(null) // null | 'not_found' | user object
   const [questCounts, setQuestCounts] = useState({})
   const channelRef = useRef(null)
 
@@ -204,6 +221,22 @@ export default function Friends() {
     setNameSearching(false)
   }
 
+  async function searchByPhone() {
+    const normalized = normalizePhone(phoneSearch)
+    if (!normalized) return
+    setPhoneSearching(true)
+    setPhoneResult(null)
+    const hash = await sha256hex(normalized)
+    const { data } = await supabase
+      .from('users')
+      .select('id, name, avatar_url, avatar_color')
+      .eq('phone_hash', hash)
+      .neq('id', user.id)
+      .maybeSingle()
+    setPhoneResult(data || 'not_found')
+    setPhoneSearching(false)
+  }
+
   async function sendFriendRequest(friendId) {
     const { data: friendship } = await supabase
       .from('friendships')
@@ -321,26 +354,61 @@ export default function Friends() {
         </p>
       )}
 
-      {/* Find from contacts */}
-      {!contactsScanned && (
+      {/* Find by phone number */}
+      <div className="mx-5 mb-4 flex gap-2" style={{ width: 'calc(100% - 40px)' }}>
+        <input
+          type="tel"
+          inputMode="numeric"
+          placeholder="Find by phone number…"
+          className="flex-1 bg-dark/5 rounded-lg px-4 py-2 text-dark/70 text-sm outline-none"
+          value={phoneSearch}
+          onChange={e => { setPhoneSearch(e.target.value); setPhoneResult(null) }}
+          onKeyDown={e => e.key === 'Enter' && searchByPhone()}
+        />
         <button
-          onClick={contactsSupported() ? findFromContacts : () => setContactsScanned(true)}
+          onClick={searchByPhone}
+          disabled={phoneSearching || !normalizePhone(phoneSearch)}
+          className="px-3 py-2 rounded-lg text-paper text-sm font-medium disabled:opacity-40 flex-shrink-0"
+          style={{ backgroundColor: '#c44829', fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {phoneSearching ? '…' : 'Find'}
+        </button>
+      </div>
+      {phoneResult && phoneResult !== 'not_found' && (
+        <div className="mx-5 mb-4 px-4 py-3 rounded-xl bg-white border border-dark/5 flex items-center gap-3">
+          <Avatar src={phoneResult.avatar_url} name={phoneResult.name} color={phoneResult.avatar_color} size={48} />
+          <div className="flex-1 min-w-0">
+            <p className="text-dark font-medium truncate">{phoneResult.name}</p>
+          </div>
+          <button
+            onClick={() => { sendRequest(phoneResult.id); setPhoneResult(null); setPhoneSearch('') }}
+            className="text-xs px-3 py-1.5 rounded-lg text-paper font-medium flex-shrink-0"
+            style={{ backgroundColor: '#c44829', fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Add
+          </button>
+        </div>
+      )}
+      {phoneResult === 'not_found' && (
+        <p className="px-5 mb-4 text-dark/30 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          No user found with that number.
+        </p>
+      )}
+
+      {/* Find from contacts — Android Contact Picker API only */}
+      {!contactsScanned && contactsSupported() && (
+        <button
+          onClick={findFromContacts}
           disabled={contactsLoading}
           className="mx-5 mb-4 w-[calc(100%-40px)] py-2.5 px-4 rounded-xl border border-dark/15 flex items-center gap-3 text-left hover:bg-dark/5 transition-colors disabled:opacity-40"
         >
           <span className="text-xl">📱</span>
           <div className="flex-1">
-            <p
-              className="text-dark text-sm font-medium"
-              style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
-            >
+            <p className="text-dark text-sm font-medium" style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}>
               {contactsLoading ? 'Scanning contacts…' : 'Find friends from contacts'}
             </p>
-            <p
-              className="text-dark/40 text-xs"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {contactsSupported() ? 'See who\'s already on the app' : 'Open on mobile to import contacts'}
+            <p className="text-dark/40 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              See who's already on the app
             </p>
           </div>
           <span className="text-dark/30 text-sm">→</span>
