@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in to Sidequest</title>
+</head>
+<body style="margin:0;padding:0;background-color:#1a1612;font-family:Georgia,serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#1a1612;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:48px 24px;">
+
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom:40px;">
+              <span style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-weight:300;font-size:42px;color:#c44829;letter-spacing:-0.02em;line-height:1;">
+                sidequest
+              </span>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#231f1a;border-radius:16px;border:1px solid rgba(244,237,224,0.08);overflow:hidden;">
+
+              <!-- Top accent bar -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="height:3px;background:linear-gradient(90deg,#c44829 0%,#d4a02a 100%);"></td>
+                </tr>
+              </table>
+
+              <!-- Card body -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:40px 40px 32px;">
+
+                    <p style="margin:0 0 8px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,237,224,0.35);">
+                      Your sign-in link
+                    </p>
+
+                    <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-weight:400;font-size:28px;color:#f4ede0;line-height:1.2;">
+                      Ready to quest?
+                    </h1>
+
+                    <p style="margin:0 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:rgba(244,237,224,0.55);">
+                      Click the button below to sign in. This link expires in 1 hour and can only be used once.
+                    </p>
+
+                    <!-- CTA Button -->
+                    <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 32px;">
+                      <tr>
+                        <td align="center" style="background-color:#c44829;border-radius:8px;">
+                          <a href="{{ .ConfirmationURL }}"
+                             style="display:inline-block;padding:14px 40px;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#1a1612;text-decoration:none;border-radius:8px;">
+                            Sign in to Sidequest →
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Divider -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+                      <tr>
+                        <td style="height:1px;background-color:rgba(244,237,224,0.08);"></td>
+                      </tr>
+                    </table>
+
+                    <!-- Fallback link -->
+                    <p style="margin:0 0 6px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(244,237,224,0.25);">
+                      Button not working?
+                    </p>
+                    <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:rgba(244,237,224,0.3);word-break:break-all;">
+                      Copy and paste this link into your browser:<br/>
+                      <a href="{{ .ConfirmationURL }}" style="color:#c44829;text-decoration:none;">
+                        {{ .ConfirmationURL }}
+                      </a>
+                    </p>
+
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:32px;">
+              <p style="margin:0 0 8px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(244,237,224,0.2);">
+                Didn't request this?
+              </p>
+              <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:rgba(244,237,224,0.2);line-height:1.5;">
+                You can safely ignore this email. No account changes were made.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
