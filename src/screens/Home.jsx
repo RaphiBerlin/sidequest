@@ -60,7 +60,7 @@ export default function Home() {
       .eq('user_id', user.id)
       .not('completed_at', 'is', null)
       .order('completed_at', { ascending: false })
-      .limit(4)
+      .limit(3)
       .then(({ data }) => setRecentSessions(data || []))
 
     supabase.from('friendships')
