@@ -587,7 +587,18 @@ export default function ActiveQuest() {
         {/* SKIP button */}
         <button
           className="text-paper/50 font-mono text-xs tracking-widest hover:text-paper/80 transition-colors uppercase w-16 text-center"
-          onClick={() => completeQuest(null)}
+          onClick={() => {
+            // Stop camera streams without completing the quest
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach(track => track.stop())
+              streamRef.current = null
+            }
+            if (pipStreamRef.current) {
+              pipStreamRef.current.getTracks().forEach(track => track.stop())
+              pipStreamRef.current = null
+            }
+            navigate('/home')
+          }}
         >
           Skip
         </button>
