@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useNotifications } from '../context/NotificationsContext'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -20,8 +19,7 @@ function timeAgo(dateStr) {
 function notificationMessage(n) {
   const name = n.from_user?.name || 'Someone'
   switch (n.type) {
-    case 'friend_request': return `${name} sent you a friend request`
-    case 'friend_accepted': return `${name} accepted your friend request`
+    case 'friend_accepted': return `You and ${name} are now friends`
     case 'reaction': return `${name} reacted ${n.data?.emoji || '❤️'} to your quest`
     case 'quest_invite': return `${name} invited you to quest together`
     default: return `${name} did something`
@@ -29,11 +27,13 @@ function notificationMessage(n) {
 }
 
 export default function Notifications() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const { notifications, markAllRead, markRead, refetch } = useNotifications()
+  // Track which request notifications have been accepted (show "now friends" inline)
+  const [acceptedIds, setAcceptedIds] = useState(new Set())
+  // Track which notifications have been dismissed (removed from view)
+  const [dismissedIds, setDismissedIds] = useState(new Set())
 
-  // Mark all read when screen opens
   useEffect(() => {
     markAllRead()
   }, [])
@@ -44,7 +44,7 @@ export default function Notifications() {
       .from('friendships')
       .update({ status: 'accepted' })
       .eq('id', n.data.friendship_id)
-    // Create friend_accepted notification for the requester
+    // Notify the requester
     await supabase.from('notifications').insert({
       user_id: n.from_user_id,
       type: 'friend_accepted',
@@ -52,8 +52,9 @@ export default function Notifications() {
       data: {},
     })
     await markRead(n.id)
+    // Show "now friends" inline instead of navigating away
+    setAcceptedIds(prev => new Set([...prev, n.id]))
     refetch()
-    navigate('/friends')
   }
 
   async function handleDeclineRequest(n) {
@@ -63,12 +64,29 @@ export default function Notifications() {
         .delete()
         .eq('id', n.data.friendship_id)
     }
-    await markRead(n.id)
+    // Delete the notification entirely
+    await supabase.from('notifications').delete().eq('id', n.id)
+    setDismissedIds(prev => new Set([...prev, n.id]))
     refetch()
   }
 
-  const pendingRequests = notifications.filter(n => n.type === 'friend_request' && n.data?.friendship_id)
-  const otherNotifications = notifications.filter(n => n.type !== 'friend_request' || !n.data?.friendship_id)
+  const visibleNotifications = notifications.filter(n => !dismissedIds.has(n.id))
+  const pendingRequests = visibleNotifications.filter(
+    n => n.type === 'friend_request' && n.data?.friendship_id && !acceptedIds.has(n.id)
+  )
+  const acceptedRequests = visibleNotifications.filter(
+    n => n.type === 'friend_request' && acceptedIds.has(n.id)
+  )
+  const otherNotifications = visibleNotifications.filter(
+    n => n.type !== 'friend_request' || !n.data?.friendship_id
+  )
+  // Merge accepted-request confirmations into the activity feed
+  const activityNotifications = [
+    ...acceptedRequests.map(n => ({ ...n, _confirmedAccept: true })),
+    ...otherNotifications,
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+  const isEmpty = pendingRequests.length === 0 && activityNotifications.length === 0
 
   return (
     <div
@@ -76,7 +94,7 @@ export default function Notifications() {
       style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
     >
       {/* Header */}
-      <div className="px-5 pt-12 pb-4 flex items-start justify-between">
+      <div className="px-5 pt-12 pb-4">
         <h1
           className="italic text-4xl text-dark"
           style={{ fontFamily: "'Fraunces', serif" }}
@@ -85,7 +103,7 @@ export default function Notifications() {
         </h1>
       </div>
 
-      {notifications.length === 0 ? (
+      {isEmpty ? (
         <div className="flex flex-col items-center justify-center py-24 text-center px-8">
           <p
             className="italic text-xl mb-3 leading-relaxed"
@@ -102,6 +120,7 @@ export default function Notifications() {
         </div>
       ) : (
         <div className="px-5 flex flex-col gap-2">
+
           {/* Pending friend requests */}
           {pendingRequests.length > 0 && (
             <div className="mb-2">
@@ -154,8 +173,8 @@ export default function Notifications() {
             </div>
           )}
 
-          {/* Other notifications */}
-          {otherNotifications.length > 0 && (
+          {/* Activity feed (other notifications + accepted confirmations) */}
+          {activityNotifications.length > 0 && (
             <div>
               {pendingRequests.length > 0 && (
                 <p
@@ -165,12 +184,10 @@ export default function Notifications() {
                   Activity
                 </p>
               )}
-              {otherNotifications.map(n => (
+              {activityNotifications.map(n => (
                 <div
                   key={n.id}
-                  className={`rounded-xl border px-4 py-3 flex items-center gap-3 mb-2 transition-colors ${
-                    !n.read ? 'bg-rust/5 border-rust/15' : 'bg-white border-dark/5'
-                  }`}
+                  className="bg-white rounded-xl border border-dark/5 px-4 py-3 flex items-center gap-3 mb-2"
                 >
                   <Avatar
                     src={n.from_user?.avatar_url}
@@ -180,7 +197,9 @@ export default function Notifications() {
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-dark text-sm leading-snug">
-                      {notificationMessage(n)}
+                      {n._confirmedAccept
+                        ? `You and ${n.from_user?.name || 'Someone'} are now friends`
+                        : notificationMessage(n)}
                     </p>
                     <p
                       className="text-dark/30 text-xs mt-0.5"
@@ -189,8 +208,8 @@ export default function Notifications() {
                       {timeAgo(n.created_at)}
                     </p>
                   </div>
-                  {!n.read && (
-                    <div className="w-2 h-2 rounded-full bg-rust flex-shrink-0" />
+                  {n._confirmedAccept && (
+                    <span className="text-base flex-shrink-0">🤝</span>
                   )}
                 </div>
               ))}
