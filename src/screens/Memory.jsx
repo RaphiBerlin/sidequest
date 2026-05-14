@@ -119,6 +119,7 @@ export default function Memory() {
   const [retakeCameraError, setRetakeCameraError] = useState(null)
   const [retakeFlash, setRetakeFlash] = useState(false)
   const [retakeUploading, setRetakeUploading] = useState(false)
+  const [retakeFacing, setRetakeFacing] = useState('environment')
   const retakeVideoRef = useRef(null)
   const retakeCanvasRef = useRef(null)
   const retakeStreamRef = useRef(null)
@@ -207,18 +208,32 @@ export default function Memory() {
 
   // ── Retake camera ─────────────────────────────────────────────────────────
 
-  async function openRetakeCamera() {
-    setRetaking(true)
-    setRetakeCameraError(null)
+  async function startRetakeStream(facing = retakeFacing) {
+    if (retakeStreamRef.current) {
+      retakeStreamRef.current.getTracks().forEach(t => t.stop())
+      retakeStreamRef.current = null
+    }
     setRetakeCameraReady(false)
+    setRetakeCameraError(null)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false })
       retakeStreamRef.current = stream
       if (retakeVideoRef.current) retakeVideoRef.current.srcObject = stream
       setRetakeCameraReady(true)
     } catch {
       setRetakeCameraError('Camera unavailable')
     }
+  }
+
+  async function openRetakeCamera() {
+    setRetaking(true)
+    await startRetakeStream('environment')
+  }
+
+  async function flipRetakeCamera() {
+    const next = retakeFacing === 'environment' ? 'user' : 'environment'
+    setRetakeFacing(next)
+    await startRetakeStream(next)
   }
 
   function closeRetakeCamera() {
@@ -229,6 +244,7 @@ export default function Memory() {
     setRetaking(false)
     setRetakeCameraReady(false)
     setRetakeCameraError(null)
+    setRetakeFacing('environment')
   }
 
   async function captureRetake() {
@@ -437,6 +453,7 @@ export default function Memory() {
                 playsInline
                 muted
                 className="absolute inset-0 w-full h-full object-cover"
+                style={retakeFacing === 'user' ? { transform: 'scaleX(-1)' } : {}}
               />
             )}
             {!retakeCameraReady && !retakeCameraError && (
@@ -458,14 +475,32 @@ export default function Memory() {
             <canvas ref={retakeCanvasRef} style={{ display: 'none' }} />
           </div>
 
-          {/* Shutter */}
-          <div className="flex items-center justify-center py-10">
+          {/* Shutter row */}
+          <div className="flex items-center justify-between px-10 py-10">
+            {/* Flip button */}
+            <button
+              onClick={retakeCameraReady ? flipRetakeCamera : undefined}
+              disabled={!retakeCameraReady}
+              className="w-12 h-12 rounded-full flex items-center justify-center bg-paper/10 text-paper/70 hover:bg-paper/20 transition-colors disabled:opacity-30"
+              aria-label="Flip camera"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 4v6h6"/>
+                <path d="M23 20v-6h-6"/>
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+              </svg>
+            </button>
+
+            {/* Shutter */}
             <button
               onClick={retakeCameraReady ? captureRetake : undefined}
               disabled={!retakeCameraReady}
               className="w-16 h-16 rounded-full border-4 border-paper/60 bg-white hover:border-paper transition-all active:scale-90 disabled:opacity-30"
               aria-label="Take photo"
             />
+
+            {/* Spacer to balance layout */}
+            <div className="w-12" />
           </div>
         </div>
       )}
