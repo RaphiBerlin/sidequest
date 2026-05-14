@@ -20,9 +20,22 @@ function notificationMessage(n) {
   const name = n.from_user?.name || 'Someone'
   switch (n.type) {
     case 'friend_accepted': return `You and ${name} are now friends`
+    case 'friend_quest_complete': {
+      const title = n.data?.quest_title
+      return title ? `${name} just completed "${title}"` : `${name} just completed a quest`
+    }
     case 'reaction': return `${name} reacted ${n.data?.emoji || '❤️'} to your quest`
     case 'quest_invite': return `${name} invited you to quest together`
     default: return `${name} did something`
+  }
+}
+
+function notificationIcon(type) {
+  switch (type) {
+    case 'friend_quest_complete': return '⚡'
+    case 'friend_accepted': return '🤝'
+    case 'reaction': return '❤️'
+    default: return null
   }
 }
 
@@ -208,8 +221,10 @@ export default function Notifications() {
                       {timeAgo(n.created_at)}
                     </p>
                   </div>
-                  {n._confirmedAccept && (
-                    <span className="text-base flex-shrink-0">🤝</span>
+                  {(n._confirmedAccept || notificationIcon(n.type)) && (
+                    <span className="text-base flex-shrink-0">
+                      {n._confirmedAccept ? '🤝' : notificationIcon(n.type)}
+                    </span>
                   )}
                 </div>
               ))}
