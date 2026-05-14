@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
   if (questId) {
     const { data, error } = await supabase
       .from("quests")
-      .select("id")
+      .select("id, duration_min")
       .eq("id", questId)
       .single();
     picked = data;
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     const randomOffset = Math.floor(Math.random() * (count ?? 1));
     const { data, error } = await supabase
       .from("quests")
-      .select("id")
+      .select("id, duration_min")
       .range(randomOffset, randomOffset)
       .single();
     picked = data;
@@ -104,13 +104,14 @@ Deno.serve(async (req) => {
     .delete()
     .neq("quest_id", "00000000-0000-0000-0000-000000000000");
 
-  // Fetch quest title for push notification
+  // Fetch quest title + duration for push notification and expiry
   const { data: questData } = await supabase
     .from("quests")
-    .select("title")
+    .select("title, duration_min")
     .eq("id", picked.id)
     .single();
   const questTitle = questData?.title ?? "A new quest awaits";
+  const durationMs = ((questData?.duration_min ?? (picked as any).duration_min ?? 45) as number) * 60 * 1000;
 
   // Insert new active quest
   const { error: insertError } = await supabase
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
     .insert({
       quest_id: picked.id,
       dropped_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + durationMs).toISOString(),
     });
 
   if (insertError) {
