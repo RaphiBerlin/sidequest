@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { completeSession } from '../lib/photos'
+import { completeSession, uploadPhoto } from '../lib/photos'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../context/ToastContext'
 import confetti from 'canvas-confetti'
@@ -113,6 +113,16 @@ export default function Memory() {
   const [caption, setCaption] = useState('')
   const [captionSaved, setCaptionSaved] = useState(false)
 
+  // Retake camera state
+  const [retaking, setRetaking] = useState(false)
+  const [retakeCameraReady, setRetakeCameraReady] = useState(false)
+  const [retakeCameraError, setRetakeCameraError] = useState(null)
+  const [retakeFlash, setRetakeFlash] = useState(false)
+  const [retakeUploading, setRetakeUploading] = useState(false)
+  const retakeVideoRef = useRef(null)
+  const retakeCanvasRef = useRef(null)
+  const retakeStreamRef = useRef(null)
+
   // Animation state
   const [phase, setPhase] = useState('upload') // 'upload' | 'spin' | 'fly' | 'done'
   const [journalFlash, setJournalFlash] = useState(false)
@@ -194,6 +204,63 @@ export default function Memory() {
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [uploading, !!mainPreview])
+
+  // ── Retake camera ─────────────────────────────────────────────────────────
+
+  async function openRetakeCamera() {
+    setRetaking(true)
+    setRetakeCameraError(null)
+    setRetakeCameraReady(false)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      retakeStreamRef.current = stream
+      if (retakeVideoRef.current) retakeVideoRef.current.srcObject = stream
+      setRetakeCameraReady(true)
+    } catch {
+      setRetakeCameraError('Camera unavailable')
+    }
+  }
+
+  function closeRetakeCamera() {
+    if (retakeStreamRef.current) {
+      retakeStreamRef.current.getTracks().forEach(t => t.stop())
+      retakeStreamRef.current = null
+    }
+    setRetaking(false)
+    setRetakeCameraReady(false)
+    setRetakeCameraError(null)
+  }
+
+  async function captureRetake() {
+    const video = retakeVideoRef.current
+    const canvas = retakeCanvasRef.current
+    if (!video || !canvas) return
+
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    setRetakeFlash(true)
+    setTimeout(() => setRetakeFlash(false), 80)
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return
+      closeRetakeCamera()
+      setRetakeUploading(true)
+      try {
+        const newUrl = await uploadPhoto(blob, user.id, sessionId, 'main')
+        if (newUrl) {
+          setMainUrl(newUrl)
+          await supabase.from('quest_sessions').update({ photo_url: newUrl }).eq('id', sessionId)
+          showToast('Photo updated!', 'success')
+        }
+      } catch {
+        showToast("Couldn't save the new photo", 'error')
+      } finally {
+        setRetakeUploading(false)
+      }
+    }, 'image/jpeg', 0.82)
+  }
 
   function handleCaptionChange(e) {
     const val = e.target.value.slice(0, CAPTION_LIMIT)
@@ -343,6 +410,66 @@ export default function Memory() {
 
   return (
     <>
+      {/* ── Retake camera overlay ─────────────────────────────────────────── */}
+      {retaking && (
+        <div className="fixed inset-0 z-[9999] bg-dark flex flex-col" style={{ background: '#1a1612' }}>
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-5 pt-12 pb-4">
+            <button
+              onClick={closeRetakeCamera}
+              className="text-paper/60 text-sm tracking-widest uppercase hover:text-paper transition-colors"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              ← Cancel
+            </button>
+            <p className="text-paper/40 text-xs tracking-widest uppercase" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              Retake photo
+            </p>
+            <div style={{ width: 60 }} />
+          </div>
+
+          {/* Camera viewfinder */}
+          <div className="flex-1 mx-4 rounded-2xl overflow-hidden relative bg-dark/80" style={{ minHeight: 300 }}>
+            {retakeCameraReady && (
+              <video
+                ref={retakeVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            {!retakeCameraReady && !retakeCameraError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                <div className="w-6 h-6 border-2 border-paper/20 border-t-rust rounded-full animate-spin" />
+                <p className="text-paper/40 text-xs font-mono">Starting camera…</p>
+              </div>
+            )}
+            {retakeCameraError && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-paper/50 text-sm font-mono text-center px-6">{retakeCameraError}</p>
+              </div>
+            )}
+            {/* Flash */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: '#fff', opacity: retakeFlash ? 1 : 0, transition: retakeFlash ? 'none' : 'opacity 120ms ease-out', zIndex: 10 }}
+            />
+            <canvas ref={retakeCanvasRef} style={{ display: 'none' }} />
+          </div>
+
+          {/* Shutter */}
+          <div className="flex items-center justify-center py-10">
+            <button
+              onClick={retakeCameraReady ? captureRetake : undefined}
+              disabled={!retakeCameraReady}
+              className="w-16 h-16 rounded-full border-4 border-paper/60 bg-white hover:border-paper transition-all active:scale-90 disabled:opacity-30"
+              aria-label="Take photo"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Dark backdrop during animation */}
       {phase !== 'done' && phase !== 'upload' && (
         <div className="fixed inset-0 z-[9997] bg-dark" />
@@ -384,14 +511,19 @@ export default function Memory() {
           {/* Memory card */}
           <div ref={cardRef} className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="relative h-60 bg-dark/10">
-              {mainPreview ? (
+              {retakeUploading ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                  <div className="w-6 h-6 border-2 border-dark/20 border-t-rust rounded-full animate-spin" />
+                  <p className="text-dark/40 text-xs font-mono">Saving…</p>
+                </div>
+              ) : mainPreview ? (
                 <img src={mainPreview} alt="quest photo" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <span className="text-dark/20 text-5xl">◐</span>
                 </div>
               )}
-              {pipPreview && (
+              {pipPreview && !retakeUploading && (
                 <div className="absolute top-2 left-2 w-16 h-24 rounded-lg border-2 border-white overflow-hidden">
                   <img src={pipPreview} alt="PiP" className="w-full h-full object-cover" />
                 </div>
@@ -399,6 +531,20 @@ export default function Memory() {
               <div className="absolute bottom-2 right-2 bg-dark/70 text-paper text-xs px-2 py-1 rounded-full" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                 {formatStamp(now)}
               </div>
+              {/* Retake button */}
+              {!retakeUploading && (
+                <button
+                  onClick={openRetakeCamera}
+                  className="absolute top-2 right-2 flex items-center gap-1.5 bg-dark/60 backdrop-blur-sm text-paper text-xs px-3 py-1.5 rounded-full hover:bg-dark/80 transition-colors"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                  Retake
+                </button>
+              )}
             </div>
 
             <div className="p-4">
