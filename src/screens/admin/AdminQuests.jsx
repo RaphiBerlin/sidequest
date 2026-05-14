@@ -18,6 +18,7 @@ export default function AdminQuests() {
   const [editingQuestId, setEditingQuestId] = useState(null)
   const [editQuest, setEditQuest] = useState({})
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -62,11 +63,17 @@ export default function AdminQuests() {
 
   async function saveQuest(id) {
     setSaving(true)
-    await supabase.from('quests').update({
+    setSaveError(null)
+    const { error } = await supabase.from('quests').update({
       title: editQuest.title.trim(),
       description: editQuest.description.trim(),
       duration_min: Number(editQuest.duration_min) || 45,
     }).eq('id', id)
+    if (error) {
+      setSaveError(error.message)
+      setSaving(false)
+      return
+    }
     setEditingQuestId(null)
     await fetchData()
     setSaving(false)
@@ -168,12 +175,15 @@ export default function AdminQuests() {
                       {saving ? 'Saving…' : 'Save'}
                     </button>
                     <button
-                      onClick={() => setEditingQuestId(null)}
+                      onClick={() => { setEditingQuestId(null); setSaveError(null) }}
                       className="text-paper/40 text-xs font-mono px-2 py-1 border border-paper/20"
                     >
                       Cancel
                     </button>
                   </div>
+                  {saveError && (
+                    <p className="text-red-400 text-xs font-mono mt-1">{saveError}</p>
+                  )}
                 </div>
               ) : (
                 <div
