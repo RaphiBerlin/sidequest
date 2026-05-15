@@ -9,9 +9,34 @@ import { cacheGet, cacheSet } from '../lib/cache'
 import { getLocationContext } from '../lib/locationContext'
 import { getInviteLink } from '../lib/invites'
 import Avatar from '../components/Avatar'
+import { useNotifications } from '../context/NotificationsContext'
+import QuestCard from '../components/QuestCard'
+
+const CARD_W = 320
+const CARD_H = CARD_W * (3.5 / 2.5)
+
+function ScaledCard({ session, cardUser, onClick }) {
+  const wrapperRef = useRef(null)
+  const [scale, setScale] = useState(null)
+  useEffect(() => {
+    if (!wrapperRef.current) return
+    setScale(wrapperRef.current.offsetWidth / CARD_W)
+  }, [])
+  return (
+    <div ref={wrapperRef} onClick={onClick} style={{ width: '100%', height: scale ? CARD_H * scale : 'auto', overflow: 'hidden', cursor: 'pointer', visibility: scale ? 'visible' : 'hidden' }}>
+      {scale !== null && (
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: CARD_W, pointerEvents: 'none' }}>
+          <QuestCard session={{ ...session, user: cardUser, reactions: [] }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { unreadCount } = useNotifications()
   const { activeQuest, loading: questLoading, newDrop, clearNewDrop } = useQuestDrop()
   const { location, locationError, locationLoading, requestLocation } = useLocation()
   const [profile, setProfile] = useState(null)
@@ -27,6 +52,7 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(null)
   const [friendCount, setFriendCount] = useState(null)
   const [completedSession, setCompletedSession] = useState(null)
+  const [inProgressSession, setInProgressSession] = useState(null)
   const timerRef = useRef(null)
 
   usePushSubscription(user?.id)
@@ -56,7 +82,7 @@ export default function Home() {
       })
 
     supabase.from('quest_sessions')
-      .select('id, photo_url, completed_at, quest:quest_id(title)')
+      .select('id, quest_id, photo_url, completed_at, elapsed_sec, xp_earned, party_ids, quest:quest_id(title, description, xp, context_tags, duration_min)')
       .eq('user_id', user.id)
       .not('completed_at', 'is', null)
       .order('completed_at', { ascending: false })
@@ -92,16 +118,32 @@ export default function Home() {
     return () => clearTimeout(timer)
   }, [newDrop])
 
-  // Check if user already completed the active quest
+  // Check if user already completed or has in-progress session for the active quest
   useEffect(() => {
-    if (!user || !activeQuest?.quest_id) { setCompletedSession(null); return }
+    if (!user || !activeQuest?.quest_id) {
+      setCompletedSession(null)
+      setInProgressSession(null)
+      return
+    }
     supabase.from('quest_sessions')
-      .select('id, photo_url')
+      .select('id, photo_url, completed_at')
       .eq('user_id', user.id)
       .eq('quest_id', activeQuest.quest_id)
-      .not('completed_at', 'is', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
-      .then(({ data }) => setCompletedSession(data ?? null))
+      .then(({ data }) => {
+        if (!data) {
+          setCompletedSession(null)
+          setInProgressSession(null)
+        } else if (data.completed_at) {
+          setCompletedSession(data)
+          setInProgressSession(null)
+        } else {
+          setCompletedSession(null)
+          setInProgressSession(data)
+        }
+      })
   }, [user, activeQuest?.quest_id])
 
   // Countdown timer for active quest
@@ -188,7 +230,7 @@ export default function Home() {
     : 'No location'
 
   return (
-    <div className="screen-enter min-h-screen bg-dark flex flex-col pb-32 overflow-y-auto" style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}>
+    <div className="screen-enter min-h-screen bg-dark flex flex-col" style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}>
       {/* Quest drop notification banner */}
       <div
         className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${newDrop ? 'translate-y-0' : '-translate-y-full'}`}
@@ -222,19 +264,64 @@ export default function Home() {
             {timeOfDay(firstName)}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/settings')}
-          className="mt-1 flex-shrink-0 rounded-full overflow-hidden hover:opacity-80 transition-opacity focus:outline-none"
-          title={user?.email}
-        >
-          <Avatar
-            src={profile?.avatar_url}
-            name={profile?.name || user?.email}
-            color={profile?.avatar_color}
-            size={36}
-          />
-        </button>
+        <div className="mt-1 flex items-center gap-3">
+          <button onClick={() => navigate('/notifications')} className="relative flex-shrink-0 focus:outline-none" style={{ color: 'rgba(244,237,224,0.5)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-bold" style={{ backgroundColor: '#c44829', color: '#f4ede0', fontFamily: "'JetBrains Mono', monospace", padding: '0 3px' }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex-shrink-0 rounded-full overflow-hidden hover:opacity-80 transition-opacity focus:outline-none"
+            title={user?.email}
+          >
+            <Avatar
+              src={profile?.avatar_url}
+              name={profile?.name || user?.email}
+              color={profile?.avatar_color}
+              size={36}
+            />
+          </button>
+        </div>
       </div>
+
+      {/* Friends / invite bar */}
+      {friendCount !== null && (
+        <div
+          className="mx-5 mb-4 rounded-2xl overflow-hidden"
+          style={{
+            background: 'rgba(196, 72, 41, 0.22)',
+            border: '1px solid rgba(196, 72, 41, 0.38)',
+          }}
+        >
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => navigate('/friends')}
+              className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+            >
+              <span className="text-base">👥</span>
+              <span className="text-paper/80 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {friendCount === 0
+                  ? 'No friends yet'
+                  : `${friendCount} friend${friendCount !== 1 ? 's' : ''}`}
+              </span>
+            </button>
+            <button
+              onClick={shareInvite}
+              className="text-xs tracking-widest uppercase border border-rust/50 text-paper/80 px-3 py-1.5 rounded-lg hover:bg-rust/20 transition-colors"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Invite →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── QUEST HERO ── */}
       {!questLoading && activeQuest ? (
@@ -284,17 +371,64 @@ export default function Home() {
 
               {/* CTA bar */}
               <button
-                onClick={() => navigate('/feed')}
+                onClick={() => navigate('/feed', { state: { questId: activeQuest.quest_id, questTitle: activeQuest.quest?.title } })}
                 className="w-full flex items-center justify-between px-5 py-4 border-t border-green-500/15 hover:bg-green-500/5 transition-colors"
                 style={{ background: 'rgba(42,212,122,0.04)' }}
               >
                 <span className="text-green-400/70 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   See everyone's submissions
                 </span>
-                <span className="text-green-400 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  →
+                <span className="text-green-400 text-sm tracking-widest uppercase" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  Review →
                 </span>
               </button>
+            </div>
+          ) : timeLeft === 0 ? (
+            /* ── EXPIRED STATE ── */
+            <div
+              className="w-full rounded-2xl overflow-hidden border border-paper/10"
+              style={{ background: 'linear-gradient(160deg, rgba(244,237,224,0.05) 0%, rgba(244,237,224,0.02) 100%)' }}
+            >
+              {/* Top strip */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-paper/20" />
+                  <span className="text-xs tracking-widest uppercase text-paper/30" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    Time's up
+                  </span>
+                </div>
+              </div>
+
+              {/* Quest title */}
+              <div className="px-5 pb-4">
+                <h2
+                  className="text-paper/50 text-3xl leading-tight mb-2"
+                  style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 600 }}
+                >
+                  {activeQuest.quest?.title}
+                </h2>
+              </div>
+
+              {/* CTA bar */}
+              {inProgressSession ? (
+                <button
+                  onClick={() => navigate(`/session/${inProgressSession.id}`)}
+                  className="w-full flex items-center justify-between px-5 py-4 border-t border-paper/8 hover:bg-paper/5 transition-colors"
+                >
+                  <span className="text-paper/40 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    View your submission
+                  </span>
+                  <span className="text-paper/40 text-sm tracking-widest uppercase" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    Open →
+                  </span>
+                </button>
+              ) : (
+                <div className="px-5 py-4 border-t border-paper/8">
+                  <span className="text-paper/25 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    You missed this one.
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             /* ── ACTIVE STATE ── */
@@ -354,7 +488,7 @@ export default function Home() {
                   className="text-paper/70 text-sm tracking-widest uppercase"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
-                  Resume →
+                  {inProgressSession ? 'Resume →' : 'Start →'}
                 </span>
               </div>
             </button>
@@ -417,87 +551,39 @@ export default function Home() {
         </div>
       )}
 
-      {/* Friends bar — floating rounded card above tab bar */}
-      {friendCount !== null && (
-        <div
-          className="fixed left-5 right-5 z-40 rounded-2xl backdrop-blur-md overflow-hidden"
-          style={{
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
-            background: 'rgba(196, 72, 41, 0.22)',
-            border: '1px solid rgba(196, 72, 41, 0.38)',
-          }}
-        >
-          <div className="flex items-center justify-between px-4 py-3">
+      {/* Recent cards */}
+      {recentSessions.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3 px-5">
+            <p className="text-paper/40 text-xs tracking-widest uppercase" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              Recent memories
+            </p>
             <button
-              onClick={() => navigate('/friends')}
-              className="flex items-center gap-2 hover:opacity-70 transition-opacity"
-            >
-              <span className="text-base">👥</span>
-              <span className="text-paper/80 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {friendCount === 0
-                  ? 'No friends yet'
-                  : `${friendCount} friend${friendCount !== 1 ? 's' : ''}`}
-              </span>
-            </button>
-            <button
-              onClick={shareInvite}
-              className="text-xs tracking-widest uppercase border border-rust/50 text-paper/80 px-3 py-1.5 rounded-lg hover:bg-rust/20 transition-colors"
+              onClick={() => navigate('/journal')}
+              className="text-paper/30 text-xs hover:text-paper/60 transition-colors"
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              Invite →
+              See all →
             </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '0 12px' }}>
+            {recentSessions.map(s => (
+              <ScaledCard
+                key={s.id}
+                session={s}
+                cardUser={{
+                  name: profile?.name || user?.user_metadata?.full_name || 'You',
+                  avatar_url: profile?.avatar_url || null,
+                  avatar_color: profile?.avatar_color || '#c44829',
+                  streak: streak || 0,
+                }}
+                onClick={() => navigate(`/session/${s.id}`)}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {/* Journal preview strip */}
-      <div className="px-5 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-paper/40 text-xs tracking-widest uppercase" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            Recent memories
-          </p>
-          <button
-            onClick={() => navigate('/journal')}
-            className="text-paper/30 text-xs hover:text-paper/60 transition-colors"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-          >
-            See all →
-          </button>
-        </div>
-        {recentSessions.length === 0 ? (
-          <button
-            onClick={() => navigate('/journal')}
-            className="text-paper/20 text-xs hover:text-paper/40 transition-colors"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-          >
-            Your story starts with the first quest.
-          </button>
-        ) : (
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {recentSessions.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => navigate('/journal')}
-                className="flex-shrink-0 flex flex-col gap-1.5 hover:opacity-80 transition-opacity"
-                style={{ width: 100 }}
-              >
-                <div className="w-full rounded-xl bg-paper/10 overflow-hidden" style={{ height: 100 }}>
-                  {s.photo_url ? (
-                    <img src={`${s.photo_url}?width=300&quality=65`} alt="quest memory" loading="lazy" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-paper/20 text-2xl">◐</div>
-                  )}
-                </div>
-                {s.quest?.title && (
-                  <p className="text-paper/40 text-xs leading-tight line-clamp-2 text-left" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
-                    {s.quest.title}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
 
     </div>
   )

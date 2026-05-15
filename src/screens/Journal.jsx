@@ -1,24 +1,42 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { cacheGet, cacheSet } from '../lib/cache'
+import QuestCard from '../components/QuestCard'
+import Avatar from '../components/Avatar'
+import { useNotifications } from '../context/NotificationsContext'
 
-function formatDate(ts) {
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-function formatTime(ts) {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
+const CARD_W = 320
+const CARD_H = CARD_W * (3.5 / 2.5) // 448
 
-function SkeletonCard() {
+function ScaledCard({ session, cardUser, onClick }) {
+  const wrapperRef = useRef(null)
+  const [scale, setScale] = useState(null)
+
+  useEffect(() => {
+    if (!wrapperRef.current) return
+    setScale(wrapperRef.current.offsetWidth / CARD_W)
+  }, [])
+
   return (
-    <div className="bg-white rounded-xl p-4 flex gap-3 animate-pulse">
-      <div className="w-16 h-16 rounded-lg bg-dark/10 flex-shrink-0" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 bg-dark/10 rounded w-3/4" />
-        <div className="h-3 bg-dark/10 rounded w-1/2" />
-      </div>
+    <div
+      ref={wrapperRef}
+      onClick={onClick}
+      style={{
+        width: '100%',
+        height: scale ? CARD_H * scale : 'auto',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        visibility: scale ? 'visible' : 'hidden',
+        flexShrink: 0,
+      }}
+    >
+      {scale !== null && (
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: CARD_W, pointerEvents: 'none' }}>
+          <QuestCard session={{ ...session, user: cardUser, reactions: [] }} />
+        </div>
+      )}
     </div>
   )
 }
@@ -26,11 +44,11 @@ function SkeletonCard() {
 export default function Journal() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { unreadCount } = useNotifications()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState(null)
   const [stats, setStats] = useState({ total: 0, streak: 0, coQuesters: 0 })
-  const [sessionReactions, setSessionReactions] = useState({})
+  const [userProfile, setUserProfile] = useState(null)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -38,7 +56,13 @@ export default function Journal() {
   useEffect(() => {
     if (!user) return
 
-    // Check cache before hitting Supabase
+    supabase
+      .from('users')
+      .select('name, avatar_url, avatar_color, streak')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => { if (data) setUserProfile(data) })
+
     const cached = cacheGet('journal_' + user.id)
     if (cached !== null) {
       setSessions(cached)
@@ -48,25 +72,21 @@ export default function Journal() {
     async function fetchJournal() {
       const { data } = await supabase
         .from('quest_sessions')
-        .select('id, quest_id, completed_at, photo_url, elapsed_sec, party_ids, quest:quest_id(title, description, xp)')
+        .select('id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, quest:quest_id(title, description, xp, context_tags, duration_min)')
         .eq('user_id', user.id)
         .not('completed_at', 'is', null)
         .order('completed_at', { ascending: false })
-        .range(0, 19)
+        .range(0, 29)
 
       const fetched = data || []
       setSessions(fetched)
       setLoading(false)
-      if (fetched.length < 20) setHasMore(false)
+      if (fetched.length < 30) setHasMore(false)
       cacheSet('journal_' + user.id, fetched, 10 * 60 * 1000)
 
-      // Stats
-      const total = fetched.length || 0
-      // Unique co-questers across all party_ids
+      const total = fetched.length
       const allPartyIds = fetched.flatMap(s => s.party_ids || [])
       const uniqueCoQuesters = new Set(allPartyIds).size
-
-      // Fetch streak from users table
       const { data: u } = await supabase.from('users').select('streak').eq('id', user.id).single()
       setStats({ total, streak: u?.streak || 0, coQuesters: uniqueCoQuesters })
     }
@@ -79,40 +99,53 @@ export default function Journal() {
     const nextPage = page + 1
     const { data } = await supabase
       .from('quest_sessions')
-      .select('id, quest_id, completed_at, photo_url, elapsed_sec, party_ids, quest:quest_id(title, description, xp)')
+      .select('id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, quest:quest_id(title, description, xp, context_tags, duration_min)')
       .eq('user_id', user.id)
       .not('completed_at', 'is', null)
       .order('completed_at', { ascending: false })
-      .range(nextPage * 20, nextPage * 20 + 19)
+      .range(nextPage * 30, nextPage * 30 + 29)
 
     const fetched = data || []
     setSessions(prev => [...prev, ...fetched])
     setPage(nextPage)
-    if (fetched.length < 20) setHasMore(false)
+    if (fetched.length < 30) setHasMore(false)
     setLoadingMore(false)
   }
 
-  async function loadReactions(sessionId) {
-    const { data } = await supabase
-      .from('reactions')
-      .select('emoji')
-      .eq('session_id', sessionId)
-
-    if (data) {
-      const grouped = data.reduce((acc, r) => {
-        acc[r.emoji] = (acc[r.emoji] || 0) + 1
-        return acc
-      }, {})
-      setSessionReactions(prev => ({ ...prev, [sessionId]: grouped }))
-    }
+  const cardUser = {
+    name: userProfile?.name || user?.user_metadata?.full_name || 'You',
+    avatar_url: userProfile?.avatar_url || null,
+    avatar_color: userProfile?.avatar_color || '#c44829',
+    streak: userProfile?.streak || stats.streak || 0,
   }
 
   return (
-    <div className="screen-enter min-h-screen bg-paper flex flex-col pb-24">
+    <div className="screen-enter min-h-screen pb-24" style={{ background: '#1a1612' }}>
+
       {/* Header */}
-      <div className="px-5 pt-12 pb-6">
-        <button onClick={() => navigate('/home')} className="text-dark/40 text-sm mb-4 block">← Back</button>
-        <h1 className="italic text-dark text-4xl" style={{ fontFamily: "'Fraunces', serif" }}>Journal</h1>
+      <div className="px-5 pt-12 pb-6 flex items-center justify-between">
+        <h1
+          className="italic text-4xl"
+          style={{ fontFamily: "'Fraunces', serif", color: '#f4ede0' }}
+        >
+          Binder
+        </h1>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/notifications')} className="relative flex-shrink-0 focus:outline-none" style={{ color: 'rgba(244,237,224,0.5)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-bold" style={{ backgroundColor: '#c44829', color: '#f4ede0', fontFamily: "'JetBrains Mono', monospace", padding: '0 3px' }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <button onClick={() => navigate('/settings')} className="flex-shrink-0 rounded-full overflow-hidden hover:opacity-80 transition-opacity focus:outline-none">
+            <Avatar src={userProfile?.avatar_url} name={userProfile?.name || user?.email} color={userProfile?.avatar_color} size={36} />
+          </button>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -122,100 +155,86 @@ export default function Journal() {
           { label: 'STREAK', value: `${stats.streak}d` },
           { label: 'CREW', value: stats.coQuesters },
         ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-xl p-3 text-center border border-dark/5">
-            <p className="text-dark/40 text-xs mb-1 tracking-widest" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{label}</p>
-            <p className="text-dark font-bold text-2xl" style={{ fontFamily: "'Fraunces', serif" }}>{value}</p>
+          <div
+            key={label}
+            className="rounded-xl p-3 text-center"
+            style={{ background: 'rgba(244,237,224,0.07)', border: '1px solid rgba(244,237,224,0.1)' }}
+          >
+            <p
+              className="text-xs mb-1 tracking-widest"
+              style={{ fontFamily: "'JetBrains Mono', monospace", color: 'rgba(244,237,224,0.4)' }}
+            >
+              {label}
+            </p>
+            <p
+              className="font-bold text-2xl"
+              style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', color: '#f4ede0' }}
+            >
+              {value}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Section label */}
-      <p className="px-5 text-dark/40 text-xs tracking-widest uppercase mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-        ▾ Recent quests
-      </p>
-
-      {/* List */}
-      <div className="px-5 flex flex-col gap-3">
+      {/* Card grid */}
+      <div style={{ padding: '0 12px' }}>
         {loading ? (
-          [1, 2, 3].map(i => <SkeletonCard key={i} />)
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {[1,2,3,4,5,6].map(i => (
+              <div
+                key={i}
+                style={{
+                  aspectRatio: '2.5 / 3.5',
+                  borderRadius: 10,
+                  background: 'rgba(244,237,224,0.06)',
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                }}
+              />
+            ))}
+          </div>
         ) : sessions.length === 0 ? (
           <div className="text-center py-16">
-            <p className="italic text-dark/40 text-xl mb-4" style={{ fontFamily: "'Fraunces', serif" }}>
-              No memories yet. Your first quest is out there.
+            <p
+              className="italic text-xl mb-6 leading-relaxed"
+              style={{ fontFamily: "'Fraunces', serif", color: 'rgba(244,237,224,0.4)' }}
+            >
+              No memories yet.{'\n'}Your first quest is out there.
             </p>
             <button
               onClick={() => navigate('/home')}
-              className="border border-rust text-rust text-sm tracking-widest uppercase px-6 py-2 hover:bg-rust hover:text-white transition-colors"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              className="border text-sm tracking-widest uppercase px-6 py-2 transition-colors"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                borderColor: '#c44829',
+                color: '#c44829',
+              }}
             >
               ▲ Drop a quest
             </button>
           </div>
         ) : (
-          sessions.map(session => {
-            const isExpanded = expandedId === session.id
-            return (
-              <div key={session.id} className="bg-white rounded-xl overflow-hidden border border-dark/5">
-                <button
-                  onClick={() => {
-                    const nextId = isExpanded ? null : session.id
-                    setExpandedId(nextId)
-                    if (nextId && !sessionReactions[nextId]) loadReactions(nextId)
-                  }}
-                  className="w-full flex items-center gap-3 p-4 text-left"
-                >
-                  {/* Thumbnail */}
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark/10 flex-shrink-0">
-                    {session.photo_url ? (
-                      <img src={`${session.photo_url}?width=200&quality=60`} alt="" loading="lazy" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-dark/20 text-2xl">◐</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="italic text-dark font-medium truncate" style={{ fontFamily: "'Fraunces', serif" }}>
-                      {session.quest?.title || 'Quest'}
-                    </p>
-                    <p className="text-dark/40 text-xs mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {formatDate(session.completed_at)} · {formatTime(session.completed_at)}
-                    </p>
-                    <p className="text-dark/30 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {(session.party_ids || []).length + 1} people
-                    </p>
-                  </div>
-                  <span className="text-dark/30 text-xs ml-2">{isExpanded ? '▴' : '▾'}</span>
-                </button>
-
-                {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-dark/5">
-                    {session.photo_url && (
-                      <img src={`${session.photo_url}?width=800&quality=80`} alt="quest photo" loading="lazy" className="w-full rounded-lg mb-3 mt-3 object-cover" style={{ maxHeight: 280 }} />
-                    )}
-                    <p className="text-dark/60 text-sm leading-relaxed">
-                      {session.quest?.description}
-                    </p>
-                    {session.elapsed_sec && (
-                      <p className="text-dark/30 text-xs mt-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        Completed in {Math.floor(session.elapsed_sec / 60)}:{String(session.elapsed_sec % 60).padStart(2, '0')}
-                      </p>
-                    )}
-                    {Object.keys(sessionReactions[session.id] || {}).length > 0 && (
-                      <p className="text-dark/40 text-xs mt-2 font-mono">
-                        {Object.entries(sessionReactions[session.id]).map(([emoji, count]) => `${emoji} ${count}`).join('  ')}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {sessions.map(session => (
+              <ScaledCard
+                key={session.id}
+                session={session}
+                cardUser={cardUser}
+                onClick={() => navigate(`/session/${session.id}`)}
+              />
+            ))}
+          </div>
         )}
+
         {!loading && sessions.length > 0 && hasMore && (
           <button
             onClick={loadMore}
             disabled={loadingMore}
-            className="mt-2 w-full border border-dark/20 text-dark/60 text-xs tracking-widest uppercase py-3 hover:bg-dark/5 transition-colors disabled:opacity-40"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            className="mt-4 w-full text-xs tracking-widest uppercase py-3 transition-colors disabled:opacity-40"
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              border: '1px solid rgba(244,237,224,0.15)',
+              color: 'rgba(244,237,224,0.4)',
+            }}
           >
             {loadingMore ? 'Loading…' : 'Load more'}
           </button>

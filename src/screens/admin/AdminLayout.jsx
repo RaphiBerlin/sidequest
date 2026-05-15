@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 const TABS = [
   { label: 'Home',       path: '/admin' },
   { label: 'Quests',     path: '/admin/quests' },
+  { label: 'Analytics',  path: '/admin/analytics' },
   { label: 'Users',      path: '/admin/users' },
   { label: 'Logs',       path: '/admin/logs' },
   { label: 'Moderation', path: '/admin/moderation' },

@@ -555,9 +555,10 @@ export default function Friends() {
         </div>
       ) : (
         filteredFriends.map(friend => (
-          <div
+          <button
             key={friend.friendshipId}
-            className="mx-5 my-1 px-4 py-3 rounded-xl bg-paper border border-dark/5 flex items-center gap-3"
+            onClick={() => navigate(`/profile/${friend.id}`)}
+            className="mx-5 my-1 px-4 py-3 rounded-xl bg-paper border border-dark/5 flex items-center gap-3 w-[calc(100%-40px)] text-left"
           >
             <Avatar src={friend.avatar_url} name={friend.name} color={friend.avatar_color} size={48} />
             <div className="flex-1 min-w-0">
@@ -571,7 +572,7 @@ export default function Friends() {
             >
               {questCounts[friend.id] ? `${questCounts[friend.id]} quests` : 'FRIEND'}
             </span>
-          </div>
+          </button>
         ))
       )}
     </div>

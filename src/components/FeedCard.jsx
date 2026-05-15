@@ -1,27 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useReactions } from '../hooks/useReactions'
 import { checkText } from '../lib/moderation'
-import Avatar from './Avatar'
+import QuestCard from './QuestCard'
 
 const FEED_EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
-
-// Deterministic gradient per user so every card without a photo has
-// a consistent colour, not random on re-render.
-const GRADIENTS = [
-  ['#c44829', '#8b2e14'],   // rust
-  ['#d4a02a', '#8b6314'],   // gold
-  ['#2a6dd4', '#143e8b'],   // blue
-  ['#2ad47a', '#148b46'],   // green
-  ['#9b2ad4', '#5e148b'],   // purple
-  ['#d42a7a', '#8b1448'],   // pink
-]
-
-function gradientForId(str) {
-  let h = 0
-  for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0
-  return GRADIENTS[Math.abs(h) % GRADIENTS.length]
-}
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -35,6 +19,7 @@ function timeAgo(dateStr) {
 }
 
 export default function FeedCard({ session, currentUserId }) {
+  const navigate = useNavigate()
   const { myReactions: mine, toggleReaction, grouped } = useReactions(session.id, currentUserId)
 
   const [showComments, setShowComments] = useState(false)
@@ -46,9 +31,9 @@ export default function FeedCard({ session, currentUserId }) {
   const inputRef = useRef(null)
   const commentsChannelRef = useRef(null)
 
-  const [gradFrom, gradTo] = gradientForId(session.user?.id ?? session.id)
+  // Total comment count from initial reactions data isn't available, so track locally
+  const [commentCount, setCommentCount] = useState(0)
 
-  // Subscribe to new comments while section is open
   useEffect(() => {
     if (!showComments || !session.id) return
     commentsChannelRef.current = supabase
@@ -91,6 +76,7 @@ export default function FeedCard({ session, currentUserId }) {
       .eq('session_id', session.id)
       .order('created_at', { ascending: true })
     setComments(data || [])
+    setCommentCount((data || []).length)
     setCommentsLoading(false)
   }
 
@@ -110,92 +96,55 @@ export default function FeedCard({ session, currentUserId }) {
     if (!body || submitting) return
     setCommentError('')
     const banned = await checkText(body)
-    if (banned) {
-      setCommentError('Your comment contains a word that isn\'t allowed.')
-      return
-    }
+    if (banned) { setCommentError("Your comment contains a word that isn't allowed."); return }
     setSubmitting(true)
     const optimistic = { id: `opt-${Date.now()}`, body, created_at: new Date().toISOString(), user: { name: 'You' } }
     setComments(prev => [...prev, optimistic])
+    setCommentCount(c => c + 1)
     setCommentText('')
     const { error } = await supabase.from('comments').insert({ session_id: session.id, user_id: currentUserId, body })
     if (error) {
       setComments(prev => prev.filter(c => c.id !== optimistic.id))
+      setCommentCount(c => c - 1)
       setCommentText(body)
     }
     setSubmitting(false)
   }
 
   const totalReactions = Object.values(grouped).reduce((a, b) => a + b, 0)
-  const commentCount = comments.length
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-dark/8">
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Trading card */}
+      <QuestCard session={session} />
 
-      {/* ── Cover area ─────────────────────────────────────────────────── */}
-      {session.photo_url ? (
-        <div className="h-56 bg-dark/10 overflow-hidden">
-          <img
-            src={`${session.photo_url}?width=600&quality=70`}
-            alt=""
-            loading="lazy"
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        /* Designed no-photo card: gradient with quest title */
-        <div
-          className="h-36 flex flex-col justify-end px-4 pb-4 relative overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }}
-        >
-          {/* Subtle texture dots */}
-          <div className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1px)',
-              backgroundSize: '20px 20px',
-            }}
-          />
-          <p
-            className="text-white/90 italic text-2xl leading-tight relative z-10"
-            style={{ fontFamily: "'Fraunces', serif" }}
+      {/* Social strip */}
+      <div
+        style={{
+          width: 320,
+          background: '#f4ede0',
+          borderLeft: '1px solid rgba(26,22,18,0.08)',
+          borderRight: '1px solid rgba(26,22,18,0.08)',
+          borderBottom: '1px solid rgba(26,22,18,0.08)',
+          borderBottomLeftRadius: 10,
+          borderBottomRightRadius: 10,
+        }}
+      >
+        {/* User attribution */}
+        {session.user?.id && session.user.id !== currentUserId && (
+          <button
+            onClick={() => navigate(`/profile/${session.user.id}`)}
+            className="flex items-center gap-2 px-3 pt-2 pb-1 w-full text-left"
           >
-            {session.quest?.title ?? 'Quest'}
-          </p>
-          <p
-            className="text-white/60 text-xs mt-1 tracking-widest uppercase relative z-10"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-          >
-            ★ Completed
-          </p>
-        </div>
-      )}
+            <span className="text-xs font-medium" style={{ fontFamily: "'JetBrains Mono', monospace", color: 'rgba(26,22,18,0.45)', letterSpacing: '0.04em' }}>
+              {session.user.name}
+            </span>
+            <span style={{ fontSize: 10, color: 'rgba(26,22,18,0.25)' }}>→</span>
+          </button>
+        )}
 
-      {/* ── Card body ──────────────────────────────────────────────────── */}
-      <div className="px-3 pt-3 pb-3">
-
-        {/* Author row */}
-        <div className="flex items-center gap-2 mb-3">
-          <Avatar
-            src={session.user?.avatar_url}
-            name={session.user?.name}
-            color={session.user?.avatar_color || gradFrom}
-            size={28}
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-dark text-sm font-medium leading-tight">{session.user?.name}</p>
-            {session.photo_url && (
-              <p className="text-dark/40 text-xs leading-tight truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {session.quest?.title}
-              </p>
-            )}
-          </div>
-          <p className="text-dark/30 text-xs flex-shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {timeAgo(session.completed_at)}
-          </p>
-        </div>
-
-        {/* Reactions row */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Reactions + comment toggle */}
+        <div className="flex items-center gap-1.5 flex-wrap px-3 py-2">
           {FEED_EMOJIS.map(emoji => (
             <button
               key={emoji}
@@ -215,7 +164,6 @@ export default function FeedCard({ session, currentUserId }) {
             </button>
           ))}
 
-          {/* Comment toggle */}
           <button
             onClick={toggleComments}
             className={`ml-auto flex items-center gap-1 px-2 py-1 rounded-full text-xs border transition-all ${
@@ -233,7 +181,7 @@ export default function FeedCard({ session, currentUserId }) {
 
         {/* Comments section */}
         {showComments && (
-          <div className="mt-3 pt-3 border-t border-dark/8">
+          <div className="px-3 pb-3 pt-1 border-t border-dark/8">
             {commentsLoading ? (
               <p className="text-dark/30 text-xs font-mono py-2">Loading…</p>
             ) : comments.length === 0 ? (

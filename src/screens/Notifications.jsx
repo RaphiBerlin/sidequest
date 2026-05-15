@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../context/NotificationsContext'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -41,7 +42,9 @@ function notificationIcon(type) {
 
 export default function Notifications() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const { notifications, markAllRead, markRead, refetch } = useNotifications()
+  const [profile, setProfile] = useState(null)
   // Track which request notifications have been accepted (show "now friends" inline)
   const [acceptedIds, setAcceptedIds] = useState(new Set())
   // Track which notifications have been dismissed (removed from view)
@@ -50,6 +53,12 @@ export default function Notifications() {
   useEffect(() => {
     markAllRead()
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    supabase.from('users').select('name, avatar_url, avatar_color').eq('id', user.id).single()
+      .then(({ data }) => { if (data) setProfile(data) })
+  }, [user])
 
   async function handleAcceptRequest(n) {
     if (!n.data?.friendship_id) return
@@ -107,13 +116,17 @@ export default function Notifications() {
       style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
     >
       {/* Header */}
-      <div className="px-5 pt-12 pb-4">
+      <div className="px-5 pt-12 pb-4 flex items-center justify-between">
         <h1
           className="italic text-4xl text-dark"
           style={{ fontFamily: "'Fraunces', serif" }}
         >
           Notifications
         </h1>
+        <button onClick={() => navigate('/settings')} className="flex-shrink-0 rounded-full overflow-hidden hover:opacity-80 transition-opacity focus:outline-none">
+          <Avatar src={profile?.avatar_url} name={profile?.name || user?.email} color={profile?.avatar_color} size={36} />
+        </button>
+
       </div>
 
       {isEmpty ? (

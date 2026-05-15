@@ -21,8 +21,11 @@ import AdminQuests from './screens/admin/AdminQuests'
 import AdminUsers from './screens/admin/AdminUsers'
 import AdminLogs from './screens/admin/AdminLogs'
 import AdminModeration from './screens/admin/AdminModeration'
+import AdminAnalytics from './screens/admin/AdminAnalytics'
 import Settings from './screens/Settings'
 import Notifications from './screens/Notifications'
+import SessionDetail from './screens/SessionDetail'
+import UserProfile from './screens/UserProfile'
 import ProtectedRoute from './components/ProtectedRoute'
 import InstallBanner from './components/InstallBanner'
 import TabBar from './components/TabBar'
@@ -183,6 +186,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="users" element={<AdminUsers />} />
               <Route path="logs" element={<AdminLogs />} />
               <Route path="moderation" element={<AdminModeration />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
             </Route>
             <Route
               path="/settings"
@@ -197,6 +201,22 @@ createRoot(document.getElementById('root')).render(
               element={
                 <ProtectedRoute>
                   <Notifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/session/:id"
+              element={
+                <ProtectedRoute>
+                  <SessionDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile/:userId"
+              element={
+                <ProtectedRoute>
+                  <UserProfile />
                 </ProtectedRoute>
               }
             />
