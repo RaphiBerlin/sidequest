@@ -34,10 +34,10 @@ export default function AdminHome() {
     setLoading(false)
   }
 
-  async function dropQuest() {
+  async function dropQuest(questId = selectedQuestId) {
     setDropping(true)
     await supabase.functions.invoke('drop-quest', {
-      body: selectedQuestId ? { quest_id: selectedQuestId } : {},
+      body: questId ? { quest_id: questId } : {},
     })
     await fetchData()
     setDropping(false)

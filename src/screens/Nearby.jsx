@@ -36,6 +36,7 @@ export default function Nearby() {
   const [invited, setInvited] = useState(new Set())
   const [lastUpdated, setLastUpdated] = useState(null)
   const [secsAgo, setSecsAgo] = useState(null)
+  const [mapReady, setMapReady] = useState(false)
   const presenceChannelRef = useRef(null)
   const timerRef = useRef(null)
   const mapContainerRef = useRef(null)
@@ -93,7 +94,7 @@ export default function Nearby() {
   // Init map once location is known
   useEffect(() => {
     if (!location || mapRef.current) return
-    mapRef.current = new mapboxgl.Map({
+    const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/dark-v11',
       center: [location.lng, location.lat],
@@ -101,32 +102,55 @@ export default function Nearby() {
       interactive: true,
       attributionControl: false,
     })
+    mapRef.current = map
     // You are here marker
     const el = document.createElement('div')
     el.style.cssText = 'width:14px;height:14px;background:#c44829;border-radius:50%;border:2px solid #1a1612;box-shadow:0 0 0 4px rgba(196,72,41,0.3)'
-    new mapboxgl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(mapRef.current)
-    return () => { mapRef.current?.remove(); mapRef.current = null }
+    new mapboxgl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(map)
+    map.on('load', () => setMapReady(true))
+    return () => { map.remove(); mapRef.current = null; setMapReady(false) }
   }, [location])
 
-  // Update nearby user markers when data changes
+  // Update nearby user markers whenever data or map readiness changes
   useEffect(() => {
-    if (!mapRef.current || !nearby.length) return
+    if (!mapReady || !mapRef.current) return
+    // Remove old markers
     markersRef.current.forEach(m => m.remove())
-    markersRef.current = nearby.map(u => {
-      if (!u.lng || !u.lat) return null
-      const el = document.createElement('div')
+    markersRef.current = []
+
+    const withCoords = nearby.filter(u => u.lat != null && u.lng != null)
+    if (!withCoords.length) return
+
+    markersRef.current = withCoords.map(u => {
       const color = TIER_COLORS[u.tier] || '#888'
-      el.style.cssText = `width:12px;height:12px;background:${color};border-radius:50%;border:2px solid #1a1612;cursor:pointer`
+      const el = document.createElement('div')
+      el.style.cssText = `
+        width: 32px; height: 32px; border-radius: 50%;
+        background: ${color}; border: 2px solid #1a1612;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Fraunces', serif; font-style: italic;
+        font-size: 13px; color: #f4ede0; cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      `
+      el.textContent = u.name?.[0]?.toUpperCase() ?? '?'
       el.title = u.name
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
         .setLngLat([u.lng, u.lat])
-        .setPopup(new mapboxgl.Popup({ offset: 12, closeButton: false })
-          .setHTML(`<span style="font-family:'Bricolage Grotesque',sans-serif;font-size:13px;color:#1a1612">${u.name}</span>`))
+        .setPopup(new mapboxgl.Popup({ offset: 18, closeButton: false })
+          .setHTML(`<span style="font-family:'Bricolage Grotesque',sans-serif;font-size:13px;color:#1a1612;font-weight:500">${u.name}</span>`))
         .addTo(mapRef.current)
       el.addEventListener('click', () => toggleSelect(u.userId))
       return marker
-    }).filter(Boolean)
-  }, [nearby])
+    })
+
+    // Fit map to show user + all friends
+    if (location) {
+      const bounds = new mapboxgl.LngLatBounds()
+      bounds.extend([location.lng, location.lat])
+      withCoords.forEach(u => bounds.extend([u.lng, u.lat]))
+      mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 800 })
+    }
+  }, [nearby, mapReady])
 
   async function sendInvite(toUserId) {
     const sessionId = localStorage.getItem('sq_session_id')

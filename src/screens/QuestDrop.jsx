@@ -8,6 +8,23 @@ import { supabase } from '../lib/supabase'
 import Avatar from '../components/Avatar'
 import { useToast } from '../context/ToastContext'
 
+function haversineFt(lat1, lng1, lat2, lng2) {
+  const R = 20902231
+  const toR = d => d * Math.PI / 180
+  const dLat = toR(lat2 - lat1), dLng = toR(lng2 - lng1)
+  const a = Math.sin(dLat/2)**2 + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+function cardinal(lat1, lng1, lat2, lng2) {
+  const toR = d => d * Math.PI / 180
+  const x = Math.sin(toR(lng2 - lng1)) * Math.cos(toR(lat2))
+  const y = Math.cos(toR(lat1)) * Math.sin(toR(lat2)) - Math.sin(toR(lat1)) * Math.cos(toR(lat2)) * Math.cos(toR(lng2 - lng1))
+  return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(x, y) * 180 / Math.PI + 360) % 360) / 45) % 8]
+}
+function fmtDist(ft) {
+  return ft < 1000 ? `${Math.round(ft / 10) * 10} ft` : `${(ft / 5280).toFixed(1)} mi`
+}
+
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
 }
@@ -30,6 +47,7 @@ export default function QuestDrop() {
   const [crewOpen, setCrewOpen] = useState(false)
   const [friends, setFriends] = useState([])
   const [friendsLoading, setFriendsLoading] = useState(false)
+  const [friendPresence, setFriendPresence] = useState({})
   const [selected, setSelected] = useState(new Set())
   const [inviting, setInviting] = useState(false)
   const [waitForCrew, setWaitForCrew] = useState(false)
@@ -74,6 +92,14 @@ export default function QuestDrop() {
         .in('id', ids)
         .order('name')
       setFriends(data || [])
+      // Fetch presence for distance/direction display
+      const { data: presence } = await supabase
+        .from('presence')
+        .select('user_id, lat, lng')
+        .in('user_id', ids)
+      const map = {}
+      presence?.forEach(r => { map[r.user_id] = { lat: r.lat, lng: r.lng } })
+      setFriendPresence(map)
       setFriendsLoading(false)
     }
     load()
@@ -185,9 +211,11 @@ export default function QuestDrop() {
     dragDeltaY.current = 0
   }
 
-  const SHEET_HEIGHT = crewOpen
-    ? (selected.size > 0 ? '96vh' : '88vh')
-    : quest?.description ? '55vh' : '40vh'
+  // Crew mode: fixed tall height for the scrollable friend list.
+  // Brief mode: auto-size to content so short descriptions don't leave dead space.
+  const sheetStyle = crewOpen
+    ? { height: selected.size > 0 ? '96vh' : '88vh' }
+    : { height: 'auto', minHeight: '30vh', maxHeight: '82vh' }
 
   return (
     <div className="screen-enter min-h-screen bg-dark flex flex-col items-center justify-center px-5 py-12 gap-6 relative overflow-hidden">
@@ -251,20 +279,11 @@ export default function QuestDrop() {
 
       {/* CTA */}
       <button
-        onClick={() => navigate('/nearby', { state: { activeQuest: aq } })}
+        onClick={() => setSheetOpen(true)}
         className="w-full max-w-sm bg-rust text-dark text-sm tracking-widest uppercase py-4 font-bold hover:opacity-90 transition-opacity"
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
-        SEE WHO'S NEARBY →
-      </button>
-
-      {/* Brief pull handle */}
-      <button
-        onClick={() => setSheetOpen(true)}
-        className="flex flex-col items-center gap-1 hover:opacity-70 transition-opacity"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-      >
-        <span className="text-paper/30 text-xs tracking-widest">▾ READ THE BRIEF</span>
+        READ THE BRIEF →
       </button>
 
       {/* Skip */}
@@ -281,11 +300,11 @@ export default function QuestDrop() {
         ref={sheetRef}
         className="fixed left-0 right-0 bottom-0 z-20 flex flex-col"
         style={{
-          height: SHEET_HEIGHT,
+          ...sheetStyle,
           background: '#f4ede0',
           borderRadius: '20px 20px 0 0',
           transform: sheetOpen ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+          transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
           boxShadow: '0 -8px 40px rgba(0,0,0,0.35)',
         }}
       >
@@ -336,9 +355,6 @@ export default function QuestDrop() {
             </p>
           )}
 
-          {/* Divider */}
-          <div style={{ height: 1, background: 'rgba(26,22,18,0.08)', marginBottom: 20 }} />
-
           {/* Crew picker (expanded) */}
           {crewOpen && (
             <div className="mb-4">
@@ -377,6 +393,18 @@ export default function QuestDrop() {
                             </p>
                           )}
                         </div>
+                        {(() => {
+                          const p = friendPresence[f.id]
+                          if (!p || !location) return null
+                          const ft = haversineFt(location.lat, location.lng, p.lat, p.lng)
+                          const dir = cardinal(location.lat, location.lng, p.lat, p.lng)
+                          return (
+                            <div className="flex-shrink-0 text-right mr-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                              <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(26,22,18,0.6)' }}>{fmtDist(ft)}</p>
+                              <p style={{ fontSize: 9, letterSpacing: '0.12em', color: 'rgba(26,22,18,0.35)', marginTop: 1 }}>{dir}</p>
+                            </div>
+                          )
+                        })()}
                         <div
                           className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
                           style={{ background: isSel ? '#c44829' : 'transparent', border: `1.5px solid ${isSel ? '#c44829' : 'rgba(26,22,18,0.2)'}` }}

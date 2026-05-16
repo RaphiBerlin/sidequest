@@ -26,7 +26,7 @@ export function NotificationsProvider({ children }) {
     if (!user) return
     fetchNotifications()
 
-    // Realtime: new notifications arriving
+    // Realtime: new/updated/deleted notifications
     if (channelRef.current) supabase.removeChannel(channelRef.current)
     channelRef.current = supabase
       .channel(`notifications-${user.id}`)
@@ -36,16 +36,31 @@ export function NotificationsProvider({ children }) {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`,
       }, async (payload) => {
-        // Fetch full row with from_user join
         const { data } = await supabase
           .from('notifications')
           .select('*, from_user:users!notifications_from_user_id_fkey(id, name, avatar_url, avatar_color)')
           .eq('id', payload.new.id)
           .single()
         if (data) {
-          setNotifications(prev => [data, ...prev])
-          setUnreadCount(c => c + 1)
+          setNotifications(prev => prev.find(n => n.id === data.id) ? prev : [data, ...prev])
+          if (!data.read) setUnreadCount(c => c + 1)
         }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchNotifications()
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchNotifications()
       })
       .subscribe()
 

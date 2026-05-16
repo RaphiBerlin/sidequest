@@ -78,7 +78,7 @@ export default function ScheduledDrops({ quests, activeQuest, schedule, dropping
           {quests.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
         </select>
         <button
-          onClick={onDrop}
+          onClick={() => onDrop(selectedQuestId)}
           disabled={dropping}
           className="bg-rust text-dark text-xs font-mono px-4 py-2 tracking-widest uppercase disabled:opacity-50 whitespace-nowrap"
         >

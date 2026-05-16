@@ -8,6 +8,7 @@ import Skeleton from '../components/Skeleton'
 import Avatar from '../components/Avatar'
 import { contactsSupported, getContactPhones, hashContactPhones, hashContactPhones as hashPhones } from '../lib/contacts'
 
+
 async function sha256hex(str) {
   const data = new TextEncoder().encode(str)
   const buf = await crypto.subtle.digest('SHA-256', data)

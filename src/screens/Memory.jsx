@@ -5,6 +5,8 @@ import { completeSession, uploadPhoto } from '../lib/photos'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../context/ToastContext'
 import confetti from 'canvas-confetti'
+import QuestCard from '../components/QuestCard'
+import { photoUrl } from '../lib/photoUrl'
 
 const CAPTION_LIMIT = 150
 
@@ -72,7 +74,7 @@ function PhotoAnimation({ src, phase, journalPos }) {
         className="w-72 h-72 rounded-2xl overflow-hidden shadow-2xl"
         style={style}
       >
-        <img src={src} alt="" className="w-full h-full object-cover" />
+        <img src={photoUrl(src, 288)} alt="" className="w-full h-full object-cover" />
       </div>
     </div>
   )
@@ -129,11 +131,25 @@ export default function Memory() {
   const [journalFlash, setJournalFlash] = useState(false)
   const [cardVisible, setCardVisible] = useState(false)
 
+  const [userProfile, setUserProfile] = useState(null)
+  const [photoVersion, setPhotoVersion] = useState(() => Date.now())
+
   const { showToast } = useToast()
   const cardRef = useRef(null)
   const captionTimerRef = useRef(null)
   const now = new Date()
   const hasCompletedRef = useRef(false)
+
+  // Fetch user profile for quest card
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('users')
+      .select('name, avatar_url, avatar_color, streak')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => { if (data) setUserProfile(data) })
+  }, [user?.id])
 
   // Inject animation keyframes once
   useEffect(() => {
@@ -208,6 +224,14 @@ export default function Memory() {
 
   // ── Retake camera ─────────────────────────────────────────────────────────
 
+  // Attach stream to video element whenever stream becomes ready —
+  // the video ref only exists after retaking=true causes a render
+  useEffect(() => {
+    if (retakeCameraReady && retakeVideoRef.current && retakeStreamRef.current) {
+      retakeVideoRef.current.srcObject = retakeStreamRef.current
+    }
+  }, [retakeCameraReady])
+
   async function startRetakeStream(facing = retakeFacing) {
     if (retakeStreamRef.current) {
       retakeStreamRef.current.getTracks().forEach(t => t.stop())
@@ -218,17 +242,22 @@ export default function Memory() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false })
       retakeStreamRef.current = stream
-      if (retakeVideoRef.current) retakeVideoRef.current.srcObject = stream
-      setRetakeCameraReady(true)
+      setRetakeCameraReady(true) // effect above will wire srcObject after render
     } catch {
       setRetakeCameraError('Camera unavailable')
     }
   }
 
-  async function openRetakeCamera() {
+  function openRetakeCamera() {
     setRetaking(true)
-    await startRetakeStream('environment')
+    // startRetakeStream is called via the useEffect below once retaking=true renders the overlay
   }
+
+  // Start stream once the retake overlay mounts
+  useEffect(() => {
+    if (!retaking) return
+    startRetakeStream('environment')
+  }, [retaking])
 
   async function flipRetakeCamera() {
     const next = retakeFacing === 'environment' ? 'user' : 'environment'
@@ -252,9 +281,20 @@ export default function Memory() {
     const canvas = retakeCanvasRef.current
     if (!video || !canvas) return
 
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+    const CARD_W = 750, CARD_H = 1050
+    const cardAspect = CARD_W / CARD_H
+    const videoW = video.videoWidth || 640
+    const videoH = video.videoHeight || 480
+    const videoAspect = videoW / videoH
+    let sx, sy, sw, sh
+    if (videoAspect > cardAspect) {
+      sh = videoH; sw = videoH * cardAspect; sx = (videoW - sw) / 2; sy = 0
+    } else {
+      sw = videoW; sh = videoW / cardAspect; sx = 0; sy = (videoH - sh) / 2
+    }
+    canvas.width = CARD_W
+    canvas.height = CARD_H
+    canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, CARD_W, CARD_H)
 
     setRetakeFlash(true)
     setTimeout(() => setRetakeFlash(false), 80)
@@ -267,6 +307,7 @@ export default function Memory() {
         const newUrl = await uploadPhoto(blob, user.id, sessionId, 'main')
         if (newUrl) {
           setMainUrl(newUrl)
+          setPhotoVersion(Date.now())
           await supabase.from('quest_sessions').update({ photo_url: newUrl }).eq('id', sessionId)
           showToast('Photo updated!', 'success')
         }
@@ -445,7 +486,7 @@ export default function Memory() {
           </div>
 
           {/* Camera viewfinder */}
-          <div className="flex-1 mx-4 rounded-2xl overflow-hidden relative bg-dark/80" style={{ minHeight: 300 }}>
+          <div className="mx-4 rounded-2xl overflow-hidden relative bg-dark/80" style={{ aspectRatio: '2.5 / 3.5' }}>
             {retakeCameraReady && (
               <video
                 ref={retakeVideoRef}
@@ -543,62 +584,52 @@ export default function Memory() {
             </p>
           </div>
 
-          {/* Memory card */}
-          <div ref={cardRef} className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="relative h-60 bg-dark/10">
-              {retakeUploading ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                  <div className="w-6 h-6 border-2 border-dark/20 border-t-rust rounded-full animate-spin" />
-                  <p className="text-dark/40 text-xs font-mono">Saving…</p>
-                </div>
-              ) : mainPreview ? (
-                <img src={mainPreview} alt="quest photo" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-dark/20 text-5xl">◐</span>
-                </div>
-              )}
-              {pipPreview && !retakeUploading && (
-                <div className="absolute top-2 left-2 w-16 h-24 rounded-lg border-2 border-white overflow-hidden">
-                  <img src={pipPreview} alt="PiP" className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="absolute bottom-2 right-2 bg-dark/70 text-paper text-xs px-2 py-1 rounded-full" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {formatStamp(now)}
+          {/* Quest card */}
+          <div ref={cardRef} className="flex flex-col items-center">
+            <QuestCard
+              session={{
+                completed_at: now.toISOString(),
+                photo_url: retakeUploading ? null : (mainPreview ? `${mainPreview}?v=${photoVersion}` : null),
+                elapsed_sec: elapsedSec,
+                xp_earned: quest?.xp || 100,
+                party_ids: party.map(p => p.id || p.userId).filter(Boolean),
+                quest: {
+                  title: quest?.title || '',
+                  description: quest?.description || '',
+                  duration_min: quest?.duration_min || 45,
+                  xp: quest?.xp || 100,
+                  context_tags: quest?.context_tags || [],
+                },
+                user: {
+                  name: userProfile?.name || user?.user_metadata?.full_name || 'You',
+                  avatar_url: userProfile?.avatar_url || null,
+                  avatar_color: userProfile?.avatar_color || '#c44829',
+                  streak: userProfile?.streak || 0,
+                },
+                reactions: [],
+                comments_count: 0,
+              }}
+            />
+            {/* Retake button below card */}
+            {!retakeUploading && mainPreview && (
+              <button
+                onClick={openRetakeCamera}
+                className="mt-3 flex items-center gap-1.5 text-dark/40 text-xs hover:text-dark/70 transition-colors"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Retake photo
+              </button>
+            )}
+            {retakeUploading && (
+              <div className="mt-3 flex items-center gap-2 text-dark/40 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                <div className="w-3 h-3 border border-dark/20 border-t-rust rounded-full animate-spin" />
+                Saving new photo…
               </div>
-              {/* Retake button */}
-              {!retakeUploading && (
-                <button
-                  onClick={openRetakeCamera}
-                  className="absolute top-2 right-2 flex items-center gap-1.5 bg-dark/60 backdrop-blur-sm text-paper text-xs px-3 py-1.5 rounded-full hover:bg-dark/80 transition-colors"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                    <circle cx="12" cy="13" r="4"/>
-                  </svg>
-                  Retake
-                </button>
-              )}
-            </div>
-
-            <div className="p-4">
-              <h2 className="italic text-dark text-xl mb-3" style={{ fontFamily: "'Fraunces', serif" }}>
-                {quest?.title || 'Quest Complete'}
-              </h2>
-              <div className="flex gap-2">
-                {[
-                  { label: 'TIME',   value: formatElapsed(elapsedSec) },
-                  { label: 'PARTY',  value: `${party.length + 1}` },
-                  { label: 'STREAK', value: '+1' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex-1 border border-dark/10 rounded-lg p-2 text-center">
-                    <p className="text-dark/40 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{label}</p>
-                    <p className="text-dark font-bold text-sm">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Public feed toggle */}
@@ -676,7 +707,7 @@ export default function Memory() {
 
           {/* Soft nudge to see feed */}
           <button
-            onClick={() => navigate('/feed')}
+            onClick={() => navigate('/feed', { state: { questId: quest?.quest_id, questTitle: quest?.title } })}
             className="text-center text-dark/30 text-xs hover:text-dark/60 transition-colors pb-4"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >

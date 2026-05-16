@@ -305,7 +305,7 @@ export default function Settings() {
             <p className="text-dark text-sm">Sidequest</p>
             <p className="text-dark/40 text-xs font-mono">v{import.meta.env.VITE_APP_VERSION || '0.1.0'}</p>
           </div>
-          <a href="mailto:berlinraphael@gmail.com?subject=Side/Quest Feedback" className="text-rust text-sm">Give feedback →</a>
+          <a href="mailto:berlinraphael@gmail.com?subject=Sidequest Feedback" className="text-rust text-sm">Give feedback →</a>
           <button onClick={() => setShowInstallModal(true)} className="text-dark/60 text-sm text-left">How to install →</button>
         </div>
       </section>

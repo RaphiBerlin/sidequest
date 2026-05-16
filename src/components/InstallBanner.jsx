@@ -71,7 +71,7 @@ export default function InstallBanner() {
         {showAndroid && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ color: '#f4ede0', fontSize: '14px', fontWeight: 500 }}>
-              Install Side/Quest
+              Install Sidequest
             </span>
             <button
               onClick={handleInstall}

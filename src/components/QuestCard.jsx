@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { photoUrl } from '../lib/photoUrl'
 
 const CARD_STYLES = `
   .sq-paper-grain::before {
@@ -153,7 +154,7 @@ export default function QuestCard({ session: s }) {
         // CORS failure — keep gold default
       }
     }
-    img.src = s.photo_url
+    img.src = photoUrl(s.photo_url, 80, 60)
   }, [s.photo_url])
 
   function onMove(e) {
@@ -220,7 +221,7 @@ export default function QuestCard({ session: s }) {
         >
           {s.photo_url ? (
             <img
-              src={s.photo_url}
+              src={photoUrl(s.photo_url, 320)}
               alt=""
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(0.92) contrast(1.04)' }}
             />

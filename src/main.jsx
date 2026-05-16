@@ -15,6 +15,7 @@ import Journal from './screens/Journal'
 import Feed from './screens/Feed'
 import Friends from './screens/Friends'
 import ActiveQuest from './screens/ActiveQuest'
+import CrewWaiting from './screens/CrewWaiting'
 import AdminLayout from './screens/admin/AdminLayout'
 import AdminHome from './screens/admin/AdminHome'
 import AdminQuests from './screens/admin/AdminQuests'
@@ -29,9 +30,11 @@ import UserProfile from './screens/UserProfile'
 import ProtectedRoute from './components/ProtectedRoute'
 import InstallBanner from './components/InstallBanner'
 import TabBar from './components/TabBar'
+import CrewLobbyPill from './components/CrewLobbyPill'
 import { AppStateProvider } from './context/AppState'
 import { ToastProvider } from './context/ToastContext'
 import { NotificationsProvider } from './context/NotificationsContext'
+import { CrewLobbyProvider } from './context/CrewLobbyContext'
 import { useAuth } from './hooks/useAuth'
 import { usePartyInvites } from './hooks/usePartyInvites'
 import './index.css'
@@ -90,6 +93,7 @@ function AppShell({ children }) {
       <OfflineBanner />
       {children}
       <PartyInviteListener />
+      <CrewLobbyPill />
       {showTabBar && <TabBar />}
     </>
   )
@@ -101,6 +105,7 @@ createRoot(document.getElementById('root')).render(
       <ErrorBoundary>
         <ToastProvider>
           <AppStateProvider>
+            <CrewLobbyProvider>
             <NotificationsProvider>
             <AppShell>
             <InstallBanner />
@@ -180,6 +185,14 @@ createRoot(document.getElementById('root')).render(
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/crew-waiting"
+              element={
+                <ProtectedRoute>
+                  <CrewWaiting />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminHome />} />
               <Route path="quests" element={<AdminQuests />} />
@@ -223,6 +236,7 @@ createRoot(document.getElementById('root')).render(
           </Routes>
             </AppShell>
             </NotificationsProvider>
+            </CrewLobbyProvider>
           </AppStateProvider>
         </ToastProvider>
       </ErrorBoundary>
