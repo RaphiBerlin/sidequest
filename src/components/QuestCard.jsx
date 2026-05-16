@@ -112,7 +112,7 @@ const fmtDate = (iso) => {
   return `${months[d.getMonth()]} ${day}${ord(day)} ${d.getFullYear()}`
 }
 
-export default function QuestCard({ session: s }) {
+export default function QuestCard({ session: s, width = 320 }) {
   const ref = useRef(null)
   const [hover, setHover] = useState(false)
   const [press, setPress] = useState(false)
@@ -180,7 +180,7 @@ export default function QuestCard({ session: s }) {
         className={`sq-card sq-paper-grain sq-paper-vignette${hover ? ' sq-hover' : ''}`}
         style={{
           position: 'relative',
-          width: 320,
+          width,
           aspectRatio: '2.5 / 3.5',
           borderRadius: 14,
           overflow: 'hidden',
@@ -221,7 +221,7 @@ export default function QuestCard({ session: s }) {
         >
           {s.photo_url ? (
             <img
-              src={photoUrl(s.photo_url, 320)}
+              src={photoUrl(s.photo_url, width)}
               alt=""
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(0.92) contrast(1.04)' }}
             />

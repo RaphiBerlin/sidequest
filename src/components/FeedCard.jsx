@@ -142,11 +142,11 @@ export default function FeedCard({ session, currentUserId }) {
     <>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Trading card */}
-        <QuestCard session={session} />
+        <QuestCard session={session} width={260} />
 
         {/* Social strip */}
         <div style={{
-          width: 320,
+          width: 260,
           background: '#f4ede0',
           borderLeft: '1px solid rgba(26,22,18,0.08)',
           borderRight: '1px solid rgba(26,22,18,0.08)',

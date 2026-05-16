@@ -584,7 +584,7 @@ export default function ActiveQuest() {
           ref={cameraFrameRef}
           onClick={expandCamera}
           className="w-full rounded-2xl border border-paper/10 overflow-hidden relative flex flex-col items-center justify-center gap-3 focus:outline-none"
-          style={{ background: '#0d0b09', aspectRatio: '2.5 / 3.5', visibility: cameraExpanded ? 'hidden' : 'visible' }}
+          style={{ background: '#0d0b09', height: 160, visibility: cameraExpanded ? 'hidden' : 'visible' }}
           aria-label="Open camera"
         >
           {capturedPhoto ? (

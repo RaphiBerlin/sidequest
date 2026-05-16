@@ -209,7 +209,7 @@ export default function Journal() {
                 color: '#c44829',
               }}
             >
-              ▲ Drop a quest
+              Complete a quest
             </button>
           </div>
         ) : (
