@@ -49,10 +49,18 @@ export default function Notifications() {
   const [acceptedIds, setAcceptedIds] = useState(new Set())
   // Track which notifications have been dismissed (removed from view)
   const [dismissedIds, setDismissedIds] = useState(new Set())
+  const [joiningInviteId, setJoiningInviteId] = useState(null)
 
   useEffect(() => {
     markAllRead()
   }, [])
+
+  // Auto-mark-read any notification that arrives while this page is open
+  useEffect(() => {
+    const unread = notifications.filter(n => !n.read)
+    if (unread.length === 0) return
+    unread.forEach(n => markRead(n.id))
+  }, [notifications])
 
   useEffect(() => {
     if (!user) return
@@ -92,6 +100,54 @@ export default function Notifications() {
     refetch()
   }
 
+  async function handleAcceptInvite(n) {
+    if (!n.data?.crew_invite_id || !n.data?.session_id) return
+    setJoiningInviteId(n.id)
+    try {
+      // Mark invite as accepted
+      await supabase
+        .from('crew_invites')
+        .update({ status: 'accepted' })
+        .eq('id', n.data.crew_invite_id)
+
+      // Fetch session + quest so we can reconstruct activeQuest state
+      const { data: session } = await supabase
+        .from('quest_sessions')
+        .select('id, quest_id, started_at, quest:quests(id, title, description, xp, duration_min, context_tags, expires_at)')
+        .eq('id', n.data.session_id)
+        .single()
+
+      // Store session_id so ActiveQuest skips creating a new one
+      localStorage.setItem('sq_session_id', n.data.session_id)
+
+      // Build activeQuest-compatible object, falling back to data cached in notification
+      const activeQuestData = n.data.active_quest ?? {
+        quest_id: session?.quest_id,
+        quest: session?.quest,
+        expires_at: session?.quest?.expires_at
+          ?? new Date(new Date(session?.started_at).getTime() + (session?.quest?.duration_min ?? 45) * 60000).toISOString(),
+      }
+
+      await markRead(n.id)
+      navigate('/active-quest', { state: { activeQuest: activeQuestData } })
+    } catch (e) {
+      console.error('handleAcceptInvite error:', e)
+      setJoiningInviteId(null)
+    }
+  }
+
+  async function handleDeclineInvite(n) {
+    if (n.data?.crew_invite_id) {
+      await supabase
+        .from('crew_invites')
+        .update({ status: 'declined' })
+        .eq('id', n.data.crew_invite_id)
+    }
+    await supabase.from('notifications').delete().eq('id', n.id)
+    setDismissedIds(prev => new Set([...prev, n.id]))
+    refetch()
+  }
+
   const visibleNotifications = notifications.filter(n => !dismissedIds.has(n.id))
   const pendingRequests = visibleNotifications.filter(
     n => n.type === 'friend_request' && n.data?.friendship_id && !acceptedIds.has(n.id)
@@ -99,8 +155,12 @@ export default function Notifications() {
   const acceptedRequests = visibleNotifications.filter(
     n => n.type === 'friend_request' && acceptedIds.has(n.id)
   )
+  const pendingInvites = visibleNotifications.filter(
+    n => n.type === 'quest_invite' && n.data?.crew_invite_id
+  )
   const otherNotifications = visibleNotifications.filter(
-    n => n.type !== 'friend_request' || !n.data?.friendship_id
+    n => (n.type !== 'friend_request' || !n.data?.friendship_id)
+      && !(n.type === 'quest_invite' && n.data?.crew_invite_id)
   )
   // Merge accepted-request confirmations into the activity feed
   const activityNotifications = [
@@ -108,7 +168,7 @@ export default function Notifications() {
     ...otherNotifications,
   ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
-  const isEmpty = pendingRequests.length === 0 && activityNotifications.length === 0
+  const isEmpty = pendingRequests.length === 0 && pendingInvites.length === 0 && activityNotifications.length === 0
 
   return (
     <div
@@ -192,6 +252,59 @@ export default function Notifications() {
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                     >
                       Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pending quest invites */}
+          {pendingInvites.length > 0 && (
+            <div className="mb-2">
+              <p
+                className="text-dark/40 text-xs tracking-widest uppercase mb-2"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                Quest Invites
+              </p>
+              {pendingInvites.map(n => (
+                <div
+                  key={n.id}
+                  className="bg-white rounded-xl border border-dark/5 px-4 py-3 flex items-center gap-3 mb-2"
+                >
+                  <Avatar
+                    src={n.from_user?.avatar_url}
+                    name={n.from_user?.name}
+                    color={n.from_user?.avatar_color}
+                    size={44}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-dark text-sm font-medium truncate">
+                      {n.from_user?.name || 'Someone'}
+                    </p>
+                    <p className="text-dark/50 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      {n.data?.quest_title ? `"${n.data.quest_title}"` : 'invited you to quest together'}
+                    </p>
+                    <p className="text-dark/30 text-xs mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      {timeAgo(n.created_at)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleAcceptInvite(n)}
+                      disabled={joiningInviteId === n.id}
+                      className="text-xs px-3 py-1.5 rounded-lg text-paper font-medium disabled:opacity-50"
+                      style={{ backgroundColor: '#c44829', fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {joiningInviteId === n.id ? '…' : 'Join'}
+                    </button>
+                    <button
+                      onClick={() => handleDeclineInvite(n)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-dark/20 text-dark/60 font-medium"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      Skip
                     </button>
                   </div>
                 </div>

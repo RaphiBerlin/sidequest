@@ -6,6 +6,56 @@ import { useAppState } from '../context/AppState'
 import { usePartySync } from '../hooks/usePartySync'
 import { useToast } from '../context/ToastContext'
 
+// Height of the top/bottom HUD bars in the expanded camera overlay
+const HUD_HEIGHT = 110
+
+// Darkened crop-guide bars that show the exact 2.5:3.5 capture boundary
+function CropGuide() {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const CARD_RATIO = 2.5 / 3.5
+  let cardW, cardH
+  if (vw / vh > CARD_RATIO) {
+    cardH = vh; cardW = cardH * CARD_RATIO
+  } else {
+    cardW = vw; cardH = cardW / CARD_RATIO
+  }
+  const barsX = Math.max(0, (vw - cardW) / 2)
+  const barsY = Math.max(0, (vh - cardH) / 2)
+  const SHADE = 'rgba(0,0,0,0.55)'
+  const BRACKET = 24
+  const THICK = 2
+  const corners = [
+    { top: barsY, left: barsX },
+    { top: barsY, right: barsX },
+    { bottom: barsY, left: barsX },
+    { bottom: barsY, right: barsX },
+  ]
+  return (
+    <>
+      {barsY > 0 && <>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: barsY, background: SHADE, zIndex: 10, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: barsY, background: SHADE, zIndex: 10, pointerEvents: 'none' }} />
+      </>}
+      {barsX > 0 && <>
+        <div style={{ position: 'absolute', top: barsY, bottom: barsY, left: 0, width: barsX, background: SHADE, zIndex: 10, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: barsY, bottom: barsY, right: 0, width: barsX, background: SHADE, zIndex: 10, pointerEvents: 'none' }} />
+      </>}
+      {/* Corner brackets */}
+      {corners.map((pos, i) => {
+        const isRight = pos.right !== undefined
+        const isBottom = pos.bottom !== undefined
+        return (
+          <div key={i} style={{ position: 'absolute', zIndex: 11, pointerEvents: 'none', ...pos }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, width: BRACKET, height: THICK, background: '#f4ede0', ...(isRight ? { left: 'auto', right: 0 } : {}) }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, width: THICK, height: BRACKET, background: '#f4ede0', ...(isRight ? { left: 'auto', right: 0 } : {}), ...(isBottom ? { top: 'auto', bottom: 0 } : {}) }} />
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 // Format milliseconds remaining as MM:SS
 function formatTime(ms) {
   if (ms <= 0) return '00:00'
@@ -42,6 +92,27 @@ export default function ActiveQuest() {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('sq_session_id'))
   const { markCompleted } = usePartySync(sessionId, user?.id, setPartyStatuses)
 
+  // Live crew invites (for sessions started via the brief sheet invite flow)
+  const [crewInvites, setCrewInvites] = useState([])
+  const crewChannelRef = useRef(null)
+
+  useEffect(() => {
+    if (!sessionId) return
+    async function fetchCrew() {
+      const { data } = await supabase
+        .from('crew_invites')
+        .select('id, to_user_id, status, to_user:users!crew_invites_to_user_id_fkey(id, name, avatar_url, avatar_color)')
+        .eq('session_id', sessionId)
+      setCrewInvites(data || [])
+    }
+    fetchCrew()
+    crewChannelRef.current = supabase
+      .channel(`aq-crew-${sessionId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'crew_invites', filter: `session_id=eq.${sessionId}` }, () => fetchCrew())
+      .subscribe()
+    return () => { if (crewChannelRef.current) supabase.removeChannel(crewChannelRef.current) }
+  }, [sessionId])
+
   // Timer state
   const [remaining, setRemaining] = useState(null)
   const intervalRef = useRef(null)
@@ -54,10 +125,16 @@ export default function ActiveQuest() {
   const [capturedPhoto, setCapturedPhoto] = useState(null) // object URL for preview
   const [flashVisible, setFlashVisible] = useState(false)
   const [shutterFired, setShutterFired] = useState(false)
+  const [streamReady, setStreamReady] = useState(false)
 
   // Dual camera state
   const [dualMode, setDualMode] = useState(false)
   const [capturedPip, setCapturedPip] = useState(null)
+
+  // Expand-in-place camera overlay state
+  const [cameraExpanded, setCameraExpanded] = useState(false)
+  const [overlayStyle, setOverlayStyle] = useState(null)
+  const cameraFrameRef = useRef(null)
 
   // Refs for camera elements
   const videoRef = useRef(null)
@@ -155,12 +232,74 @@ export default function ActiveQuest() {
     }
   }, [])
 
+  // ── Expand / collapse camera overlay ─────────────────────────────────────
+  const expandCamera = useCallback(() => {
+    const rect = cameraFrameRef.current?.getBoundingClientRect()
+    if (!rect) return
+    // Phase 1: place overlay exactly on top of the in-layout card (no transition)
+    setOverlayStyle({
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      borderRadius: 16,
+      transition: 'none',
+    })
+    setCameraExpanded(true)
+    if (!cameraEnabled) enableCamera()
+    // Phase 2: next paint — animate to full screen
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setOverlayStyle({
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          borderRadius: 0,
+          transition: 'top 0.45s cubic-bezier(0.32,0.72,0,1), left 0.45s cubic-bezier(0.32,0.72,0,1), width 0.45s cubic-bezier(0.32,0.72,0,1), height 0.45s cubic-bezier(0.32,0.72,0,1), border-radius 0.45s cubic-bezier(0.32,0.72,0,1)',
+        })
+      })
+    })
+  }, [])
+
+  const collapseCamera = useCallback(() => {
+    const rect = cameraFrameRef.current?.getBoundingClientRect()
+    if (!rect) return
+    // Animate back to card position
+    setOverlayStyle(prev => ({
+      ...prev,
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      borderRadius: 16,
+      transition: 'top 0.4s cubic-bezier(0.32,0.72,0,1), left 0.4s cubic-bezier(0.32,0.72,0,1), width 0.4s cubic-bezier(0.32,0.72,0,1), height 0.4s cubic-bezier(0.32,0.72,0,1), border-radius 0.4s cubic-bezier(0.32,0.72,0,1)',
+    }))
+    setTimeout(() => {
+      setCameraExpanded(false)
+      setOverlayStyle(null)
+      setCameraEnabled(false)
+      setCapturedPhoto(null)
+      setCapturedPip(null)
+      setDualMode(false)
+      setStreamReady(false)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+      if (pipStreamRef.current) {
+        pipStreamRef.current.getTracks().forEach(t => t.stop())
+        pipStreamRef.current = null
+      }
+    }, 420)
+  }, [])
+
   // ── Camera enable ─────────────────────────────────────────────────────────
   const enableCamera = useCallback(async () => {
     setCameraError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: { facingMode, width: { ideal: 3840 }, height: { ideal: 2160 } },
         audio: false,
       })
       streamRef.current = stream
@@ -277,21 +416,33 @@ export default function ActiveQuest() {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
+    if (!video.videoWidth || !video.videoHeight) return  // stream not ready yet
 
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
+    // Crop video to card aspect ratio (2.5 / 3.5)
+    const CARD_W = 1440, CARD_H = 2016
+    const cardAspect = CARD_W / CARD_H
+    const videoW = video.videoWidth
+    const videoH = video.videoHeight
+    const videoAspect = videoW / videoH
+    let sx, sy, sw, sh
+    if (videoAspect > cardAspect) {
+      sh = videoH; sw = videoH * cardAspect; sx = (videoW - sw) / 2; sy = 0
+    } else {
+      sw = videoW; sh = videoW / cardAspect; sx = 0; sy = (videoH - sh) / 2
+    }
+    canvas.width = CARD_W
+    canvas.height = CARD_H
 
     const ctx = canvas.getContext('2d')
 
     if (facingMode === 'user') {
       // Mirror for selfie
-      ctx.translate(canvas.width, 0)
+      ctx.translate(CARD_W, 0)
       ctx.scale(-1, 1)
-      ctx.drawImage(video, 0, 0)
-      ctx.setTransform(1, 0, 0, 1, 0, 0) // restore
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, CARD_W, CARD_H)
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
     } else {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, CARD_W, CARD_H)
     }
 
     // Flash effect
@@ -305,22 +456,22 @@ export default function ActiveQuest() {
     if (dualMode && pipVideoRef.current && pipCanvasRef.current) {
       // Dual capture — grab both canvases as blobs
       const pipCanvas = pipCanvasRef.current
-      pipCanvas.width = 300
-      pipCanvas.height = 420
+      pipCanvas.width = 600
+      pipCanvas.height = 840
       const pipCtx = pipCanvas.getContext('2d')
       const pipVideo = pipVideoRef.current
 
       // Draw PiP mirrored (front camera)
-      pipCtx.translate(300, 0)
+      pipCtx.translate(600, 0)
       pipCtx.scale(-1, 1)
-      pipCtx.drawImage(pipVideo, 0, 0, 300, 420)
+      pipCtx.drawImage(pipVideo, 0, 0, 600, 840)
       pipCtx.setTransform(1, 0, 0, 1, 0, 0)
 
       const mainBlobPromise = new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.75)
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92)
       })
       const pipBlobPromise = new Promise((resolve) => {
-        pipCanvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.75)
+        pipCanvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92)
       })
 
       Promise.all([mainBlobPromise, pipBlobPromise]).then(([mainBlob, pipBlob]) => {
@@ -346,7 +497,7 @@ export default function ActiveQuest() {
         setTimeout(() => {
           completeQuest(blob, null)
         }, 1200)
-      }, 'image/jpeg', 0.75)
+      }, 'image/jpeg', 0.92)
     }
   }, [facingMode, dualMode, completeQuest])
 
@@ -424,185 +575,164 @@ export default function ActiveQuest() {
         </p>
 
         {/* Party row */}
-        <PartyRow party={party} partyStatuses={partyStatuses} />
+        <PartyRow party={party} partyStatuses={partyStatuses} crewInvites={crewInvites} />
       </div>
 
-      {/* ── Camera frame ─────────────────────────────────────────────────── */}
-      <div className="flex-1 px-4 pb-2 min-h-[280px]">
-        <div
-          className="w-full h-full rounded-2xl border border-paper/10 overflow-hidden relative flex flex-col items-center justify-center gap-4"
-          style={{ background: '#0d0b09', minHeight: 280 }}
+      {/* ── Camera card — tap to open full-screen capture ───────────────── */}
+      <div className="px-4 pb-4">
+        <button
+          ref={cameraFrameRef}
+          onClick={expandCamera}
+          className="w-full rounded-2xl border border-paper/10 overflow-hidden relative flex flex-col items-center justify-center gap-3 focus:outline-none"
+          style={{ background: '#0d0b09', aspectRatio: '2.5 / 3.5', visibility: cameraExpanded ? 'hidden' : 'visible' }}
+          aria-label="Open camera"
         >
-          {/* Captured photo preview */}
-          {capturedPhoto && (
-            <img
-              src={capturedPhoto}
-              alt="Captured"
-              className="absolute inset-0 w-full h-full object-cover rounded-2xl"
-            />
+          {capturedPhoto ? (
+            <img src={capturedPhoto} alt="Captured" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(244,237,224,0.25)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              <p className="text-paper/30 text-xs tracking-widest font-mono uppercase">Tap to capture</p>
+            </>
           )}
+        </button>
+      </div>
 
-          {/* Live video feed */}
-          {cameraEnabled && !capturedPhoto && (
+      {/* ── Skip row (no shutter — controls are in the overlay) ──────────── */}
+      <div className="px-6 pb-10 flex justify-end">
+        <button
+          className="text-paper/30 font-mono text-xs tracking-widest hover:text-paper/50 transition-colors uppercase"
+          onClick={() => {
+            if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null }
+            if (pipStreamRef.current) { pipStreamRef.current.getTracks().forEach(t => t.stop()); pipStreamRef.current = null }
+            navigate('/home')
+          }}
+        >
+          Skip →
+        </button>
+      </div>
+
+      {/* Hidden canvases for capture */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <canvas ref={pipCanvasRef} style={{ display: 'none' }} />
+
+      {/* ── Expanded camera overlay ───────────────────────────────────────── */}
+      {cameraExpanded && overlayStyle && (
+        <div
+          style={{
+            position: 'fixed',
+            top: overlayStyle.top,
+            left: overlayStyle.left,
+            width: overlayStyle.width,
+            height: overlayStyle.height,
+            borderRadius: overlayStyle.borderRadius,
+            transition: overlayStyle.transition,
+            background: '#000',
+            zIndex: 100,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Live video — fills entire overlay */}
+          {!capturedPhoto && (
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="absolute inset-0 w-full h-full object-cover rounded-2xl"
-              style={facingMode === 'user' ? { transform: 'scaleX(-1)' } : {}}
+              onLoadedMetadata={() => setStreamReady(true)}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
             />
           )}
 
-          {/* PiP video (front camera) — visible when dualMode is ON */}
-          {cameraEnabled && !capturedPhoto && dualMode && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 8,
-                left: 8,
-                width: 100,
-                height: 140,
-                border: '2px solid #ffffff',
-                borderRadius: 8,
-                overflow: 'hidden',
-                zIndex: 20,
-              }}
-            >
-              <video
-                ref={pipVideoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  transform: 'scaleX(-1)',
-                }}
-              />
+          {/* Captured photo preview */}
+          {capturedPhoto && (
+            <img src={capturedPhoto} alt="Captured" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
+
+          {/* PiP video */}
+          {!capturedPhoto && dualMode && (
+            <div style={{ position: 'absolute', top: 80, left: 12, width: 90, height: 126, border: '2px solid #fff', borderRadius: 8, overflow: 'hidden', zIndex: 20 }}>
+              <video ref={pipVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
             </div>
           )}
 
-          {/* DUAL toggle button — visible when camera is enabled */}
-          {cameraEnabled && (
+          {/* Crop guide — darkened bars outside the 2.5:3.5 card zone */}
+          <CropGuide />
+
+          {/* Flash overlay */}
+          <div style={{ position: 'absolute', inset: 0, background: '#fff', opacity: flashVisible ? 1 : 0, transition: flashVisible ? 'none' : 'opacity 120ms ease-out', zIndex: 60, pointerEvents: 'none' }} />
+
+          {/* HUD — top bar */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HUD_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, paddingRight: 16, paddingTop: 'env(safe-area-inset-top, 0px)', zIndex: 40 }}>
+            <button
+              onClick={collapseCamera}
+              style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', border: 'none', color: '#f4ede0', fontSize: 18, cursor: 'pointer' }}
+              aria-label="Close camera"
+            >
+              ←
+            </button>
+            <TimerPill remaining={remaining} color={timerColor} shaking={isShaking} />
+            {/* DUAL toggle */}
             <button
               onClick={toggleDualMode}
-              style={{
-                position: 'absolute',
-                top: 8,
-                left: dualMode ? 116 : 8,
-                zIndex: 30,
-                background: dualMode ? '#c44829' : 'rgba(0,0,0,0.6)',
-                border: 'none',
-                borderRadius: 4,
-                color: '#f4ede0',
-                fontFamily: 'monospace',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                padding: '3px 7px',
-                cursor: 'pointer',
-                transition: 'background 0.2s, left 0.2s',
-              }}
-              aria-label="Toggle dual camera"
+              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: dualMode ? '#c44829' : 'rgba(0,0,0,0.45)', color: '#f4ede0', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer' }}
             >
               DUAL
             </button>
-          )}
+          </div>
 
-          {/* Placeholder — shown when camera not yet enabled and no error */}
-          {!cameraEnabled && !cameraError && (
-            <>
-              <div className="text-paper/30 text-5xl">📷</div>
-              <p className="text-paper/40 text-sm font-mono">
-                Tap to enable camera
-              </p>
-              <button
-                onClick={enableCamera}
-                className="px-5 py-2 rounded-full border border-paper/20 text-paper/60 text-xs font-mono tracking-wider hover:border-paper/40 hover:text-paper/80 transition-all"
-              >
-                Enable Camera
-              </button>
-            </>
-          )}
+          {/* Shutter controls — bottom bar */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HUD_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 40, paddingRight: 40, paddingBottom: 'env(safe-area-inset-bottom, 0px)', zIndex: 40 }}>
+            {/* Flip */}
+            <button
+              onClick={flipCamera}
+              style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.45)', borderRadius: '50%', border: 'none', color: '#f4ede0', cursor: 'pointer' }}
+              aria-label="Flip camera"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+              </svg>
+            </button>
 
-          {/* Error state */}
+            {/* Shutter */}
+            <div className="relative flex flex-col items-center" style={{ width: 72 }}>
+              {!streamReady && !capturedPhoto && cameraEnabled && (
+                <p style={{ position: 'absolute', top: -22, fontFamily: 'monospace', fontSize: 10, color: 'rgba(244,237,224,0.5)', whiteSpace: 'nowrap', letterSpacing: '0.08em' }}>
+                  starting camera…
+                </p>
+              )}
+              <div className="relative" style={{ width: 72, height: 72 }}>
+                <button
+                  onClick={!capturedPhoto && streamReady ? capturePhoto : undefined}
+                  disabled={!!capturedPhoto || !streamReady}
+                  style={{ width: 72, height: 72, borderRadius: '50%', background: '#fff', border: '4px solid rgba(255,255,255,0.6)', cursor: (capturedPhoto || !streamReady) ? 'default' : 'pointer', transition: 'transform 0.1s, opacity 0.2s', boxShadow: '0 0 0 3px rgba(255,255,255,0.25)', opacity: (!capturedPhoto && !streamReady) ? 0.45 : 1 }}
+                  className="active:scale-90"
+                  aria-label="Take photo"
+                />
+                {shutterFired && (
+                  <div className="absolute inset-0 rounded-full border-2 border-white animate-shutter-ring pointer-events-none" />
+                )}
+              </div>
+            </div>
+
+            {/* Spacer to balance flip button */}
+            <div style={{ width: 44 }} />
+          </div>
+
+          {/* Error */}
           {cameraError && (
-            <p className="text-paper/60 text-sm font-mono text-center px-6">
-              {cameraError}
-            </p>
-          )}
-
-          {/* Flash overlay */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: '#ffffff',
-              opacity: flashVisible ? 1 : 0,
-              transition: flashVisible ? 'none' : 'opacity 120ms ease-out',
-              zIndex: 50,
-            }}
-          />
-
-          {/* Hidden canvas for main capture */}
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-
-          {/* Hidden canvas for PiP capture */}
-          <canvas ref={pipCanvasRef} style={{ display: 'none' }} />
-        </div>
-      </div>
-
-      {/* ── Shutter row ──────────────────────────────────────────────────── */}
-      <div className="px-6 pb-10 pt-3 flex items-center justify-between">
-        {/* FLIP button */}
-        <button
-          onClick={cameraEnabled ? flipCamera : undefined}
-          className={`font-mono text-xs tracking-widest transition-colors uppercase w-16 text-center ${
-            cameraEnabled
-              ? 'text-paper/50 hover:text-paper/80'
-              : 'text-paper/20 cursor-default'
-          }`}
-        >
-          Flip
-        </button>
-
-        {/* Shutter circle */}
-        <div className="relative flex items-center justify-center" style={{ width: 64, height: 64 }}>
-          <button
-            onClick={cameraEnabled && !capturedPhoto ? capturePhoto : undefined}
-            className={`rounded-full flex items-center justify-center border-4 transition-all active:scale-95 ${
-              cameraEnabled && !capturedPhoto
-                ? 'border-paper/60 hover:border-paper active:scale-90'
-                : 'border-paper/20 opacity-50 cursor-default'
-            }`}
-            style={{ width: 64, height: 64, background: '#fff' }}
-            aria-label="Take photo"
-          />
-          {shutterFired && (
-            <div className="absolute inset-0 rounded-full border-2 border-white animate-shutter-ring pointer-events-none" />
+            <div style={{ position: 'absolute', bottom: HUD_HEIGHT + 16, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 40 }}>
+              <p style={{ fontFamily: 'monospace', fontSize: 12, color: 'rgba(244,237,224,0.6)', background: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: '6px 12px', textAlign: 'center', maxWidth: 260 }}>
+                {cameraError}
+              </p>
+            </div>
           )}
         </div>
-
-        {/* SKIP button */}
-        <button
-          className="text-paper/50 font-mono text-xs tracking-widest hover:text-paper/80 transition-colors uppercase w-16 text-center"
-          onClick={() => {
-            // Stop camera streams without completing the quest
-            if (streamRef.current) {
-              streamRef.current.getTracks().forEach(track => track.stop())
-              streamRef.current = null
-            }
-            if (pipStreamRef.current) {
-              pipStreamRef.current.getTracks().forEach(track => track.stop())
-              pipStreamRef.current = null
-            }
-            navigate('/home')
-          }}
-        >
-          Skip
-        </button>
-      </div>
+      )}
     </div>
   )
 }
@@ -641,12 +771,54 @@ function getPartyStatus(memberId, partyStatuses) {
 }
 
 // ── Party row sub-component ──────────────────────────────────────────────────
-function PartyRow({ party, partyStatuses = {} }) {
-  const isSolo = !party || party.length === 0
+const INVITE_DOT = {
+  pending:  { bg: 'rgba(212,160,42,0.9)',  title: 'Pending' },
+  accepted: { bg: 'rgba(42,140,110,0.9)',  title: 'Joined'  },
+  declined: { bg: 'rgba(196,72,41,0.9)',   title: 'Declined' },
+}
+
+function PartyRow({ party, partyStatuses = {}, crewInvites = [] }) {
+  // Prefer crew invites (new flow) over nearby party (old flow)
+  const hasCrewInvites = crewInvites.length > 0
+  const isSolo = !hasCrewInvites && (!party || party.length === 0)
+
+  if (hasCrewInvites) {
+    return (
+      <div className="flex items-center gap-3 mt-1 flex-wrap">
+        <div className="flex items-center">
+          {crewInvites.slice(0, 5).map((inv, i) => {
+            const name = inv.to_user?.name ?? '?'
+            const initial = name[0]?.toUpperCase() ?? '?'
+            const bg = avatarColor(name)
+            const dot = INVITE_DOT[inv.status] ?? INVITE_DOT.pending
+            return (
+              <div
+                key={inv.id}
+                className="w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-mono font-bold text-dark"
+                style={{ background: bg, borderColor: '#1a1612', marginLeft: i === 0 ? 0 : -8, zIndex: crewInvites.length - i, position: 'relative' }}
+                title={`${name} — ${dot.title}`}
+              >
+                {initial}
+                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full" style={{ background: dot.bg, transform: 'translate(25%, 25%)' }} />
+              </div>
+            )
+          })}
+        </div>
+        <span className="font-mono text-xs tracking-widest" style={{ color: 'rgba(244,237,224,0.5)', fontVariant: 'small-caps' }}>
+          CREW OF {crewInvites.length}
+        </span>
+        {crewInvites.some(i => i.status === 'pending') && (
+          <span className="font-mono text-[10px] tracking-widest" style={{ color: 'rgba(212,160,42,0.7)' }}>
+            · waiting for {crewInvites.filter(i => i.status === 'pending').length}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center gap-3 mt-1">
-      {/* Avatar stack */}
+      {/* Avatar stack — nearby party flow */}
       {!isSolo && (
         <div className="flex items-center">
           {party.slice(0, 5).map((member, i) => {
@@ -659,47 +831,24 @@ function PartyRow({ party, partyStatuses = {} }) {
               <div
                 key={memberId ?? i}
                 className="w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-mono font-bold text-dark"
-                style={{
-                  background: bg,
-                  borderColor: '#1a1612',
-                  marginLeft: i === 0 ? 0 : -8,
-                  zIndex: party.length - i,
-                  position: 'relative',
-                }}
+                style={{ background: bg, borderColor: '#1a1612', marginLeft: i === 0 ? 0 : -8, zIndex: party.length - i, position: 'relative' }}
               >
                 {initial}
-                {/* Status indicator */}
                 {status === 'active' && (
-                  <span
-                    className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green-400"
-                    style={{ transform: 'translate(25%, 25%)' }}
-                  />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green-400" style={{ transform: 'translate(25%, 25%)' }} />
                 )}
                 {status === 'completed' && (
-                  <span
-                    className="absolute bottom-0 right-0 text-gold text-xs leading-none"
-                    style={{ transform: 'translate(25%, 25%)', fontSize: 9 }}
-                  >
-                    ✓
-                  </span>
+                  <span className="absolute bottom-0 right-0 text-gold text-xs leading-none" style={{ transform: 'translate(25%, 25%)', fontSize: 9 }}>✓</span>
                 )}
                 {status === 'unknown' && (
-                  <span
-                    className="absolute bottom-0 right-0 w-2 h-2 rounded-full"
-                    style={{ background: 'rgba(244,237,224,0.2)', transform: 'translate(25%, 25%)' }}
-                  />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full" style={{ background: 'rgba(244,237,224,0.2)', transform: 'translate(25%, 25%)' }} />
                 )}
               </div>
             )
           })}
         </div>
       )}
-
-      {/* Label */}
-      <span
-        className="font-mono text-xs tracking-widest"
-        style={{ color: 'rgba(244,237,224,0.5)', fontVariant: 'small-caps' }}
-      >
+      <span className="font-mono text-xs tracking-widest" style={{ color: 'rgba(244,237,224,0.5)', fontVariant: 'small-caps' }}>
         {isSolo ? 'GOING SOLO' : `PARTY OF ${party.length}`}
       </span>
     </div>

@@ -220,7 +220,7 @@ function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession
             >
               <QuestCard session={activeSession} />
             </div>
-            <ActiveSocialStrip session={activeSession} currentUserId={currentUserId} />
+            {activeSession && <ActiveSocialStrip session={activeSession} currentUserId={currentUserId} />}
           </div>
         </>
       )}
@@ -403,46 +403,48 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Tab toggle */}
-      <div className="flex justify-center gap-8 mb-3 flex-shrink-0">
-        {[['public', 'Public'], ['friends', 'Friends']].map(([t, label]) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="text-sm tracking-widest uppercase pb-0.5"
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              color: tab === t ? '#f4ede0' : 'rgba(244,237,224,0.3)',
-              borderBottom: tab === t ? '2px solid #f4ede0' : '2px solid transparent',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Tab toggle + filter on same row */}
+      <div className="relative flex items-center justify-center px-5 mb-3 flex-shrink-0">
+        {/* Tabs — truly centered */}
+        <div className="flex gap-8">
+          {[['public', 'Public'], ['friends', 'Friends']].map(([t, label]) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="text-sm tracking-widest uppercase pb-0.5"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                color: tab === t ? '#f4ede0' : 'rgba(244,237,224,0.3)',
+                borderBottom: tab === t ? '2px solid #f4ede0' : '2px solid transparent',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {/* Filter dropdown */}
-      {!loading && filterOptions.length > 1 && (
-        <div className="flex justify-center mb-3 flex-shrink-0">
+        {/* Filter dropdown — absolutely positioned to the right */}
+        {!loading && filterOptions.length > 1 && (
+          <div className="absolute right-5 top-0 bottom-0 flex items-center">
           <div className="relative">
             {dropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />}
             <button
               onClick={() => setDropdownOpen(o => !o)}
-              className="relative z-20 flex items-center gap-2 px-4 py-2 rounded-full"
+              className="relative z-20 flex items-center gap-2 px-3 py-1.5 rounded-full"
               style={{
-                fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
                 border: filter !== 'all' ? '1px solid rgba(196,72,41,0.5)' : '1px solid rgba(244,237,224,0.18)',
                 backgroundColor: filter !== 'all' ? 'rgba(196,72,41,0.12)' : 'transparent',
                 color: filter !== 'all' ? '#c44829' : 'rgba(244,237,224,0.5)',
               }}
             >
-              <span className="tracking-widest uppercase">{currentOption.label}</span>
+              <span className="tracking-widest uppercase">{currentOption?.label}</span>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ transition: 'transform 0.15s', transform: dropdownOpen ? 'rotate(180deg)' : 'none' }}>
                 <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             {dropdownOpen && (
-              <div className="absolute top-full mt-2 z-20 rounded-2xl overflow-hidden" style={{ left: '50%', transform: 'translateX(-50%)', minWidth: 220, backgroundColor: '#2a2018', border: '1px solid rgba(244,237,224,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+              <div className="absolute top-full mt-2 z-20 rounded-2xl overflow-hidden" style={{ right: 0, minWidth: 220, backgroundColor: '#2a2018', border: '1px solid rgba(244,237,224,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
                 {filterOptions.map((opt, i) => (
                   <button key={opt.key} onClick={() => { setFilter(opt.key); setDropdownOpen(false) }}
                     className="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -462,8 +464,9 @@ export default function Feed() {
               </div>
             )}
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* Main content */}
       <SwipeableCardArea
