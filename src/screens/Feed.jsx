@@ -10,7 +10,7 @@ import { useReactions } from '../hooks/useReactions'
 const SESSION_SELECT = 'id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, is_public, user:users(id, name, avatar_url, avatar_color, streak), quest:quests(title, description, xp, context_tags, duration_min), reactions(emoji, user_id)'
 const FEED_EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
 function getCardWidth() {
-  return Math.min(window.innerWidth - 32, 360)
+  return Math.min(window.innerWidth - 48, 340)
 }
 
 function dayLabel(dateStr) {

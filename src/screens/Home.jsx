@@ -10,27 +10,17 @@ import { getLocationContext } from '../lib/locationContext'
 import { getInviteLink } from '../lib/invites'
 import Avatar from '../components/Avatar'
 import { useNotifications } from '../context/NotificationsContext'
-import QuestCard from '../components/QuestCard'
+import { ScaledCard } from '../components/QuestCard'
 
-const CARD_W = 320
-const CARD_H = CARD_W * (3.5 / 2.5)
+const GRID_PADDING = 24
+const GRID_GAP = 10
+const MIN_COL_W = 120
 
-function ScaledCard({ session, cardUser, onClick }) {
-  const wrapperRef = useRef(null)
-  const [scale, setScale] = useState(null)
-  useEffect(() => {
-    if (!wrapperRef.current) return
-    setScale(wrapperRef.current.offsetWidth / CARD_W)
-  }, [])
-  return (
-    <div ref={wrapperRef} onClick={onClick} style={{ width: '100%', height: scale ? CARD_H * scale : 'auto', overflow: 'hidden', cursor: 'pointer', visibility: scale ? 'visible' : 'hidden' }}>
-      {scale !== null && (
-        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: CARD_W, pointerEvents: 'none' }}>
-          <QuestCard session={{ ...session, user: cardUser, reactions: [] }} />
-        </div>
-      )}
-    </div>
-  )
+function getLayout() {
+  const available = window.innerWidth - GRID_PADDING
+  const cols = Math.max(2, Math.min(3, Math.floor(available / (MIN_COL_W + GRID_GAP))))
+  const colW = Math.floor((available - GRID_GAP * (cols - 1)) / cols)
+  return { cols, colW }
 }
 
 export default function Home() {
@@ -53,9 +43,16 @@ export default function Home() {
   const [friendCount, setFriendCount] = useState(null)
   const [completedSession, setCompletedSession] = useState(null)
   const [inProgressSession, setInProgressSession] = useState(null)
+  const [layout, setLayout] = useState(getLayout)
   const timerRef = useRef(null)
 
   usePushSubscription(user?.id)
+
+  useEffect(() => {
+    const handler = () => setLayout(getLayout())
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -260,7 +257,7 @@ export default function Home() {
           <h1 className="text-rust italic text-xl leading-none mb-1" style={{ fontFamily: "'Fraunces', serif" }}>
             Sidequest
           </h1>
-          <p className="text-paper text-3xl leading-tight" style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 300 }}>
+          <p className="text-paper leading-tight" style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(20px, 6vw, 30px)' }}>
             {timeOfDay(firstName)}
           </p>
         </div>
@@ -349,8 +346,8 @@ export default function Home() {
               <div className="px-5 pb-4 flex items-start gap-4">
                 <div className="flex-1">
                   <h2
-                    className="text-paper text-3xl leading-tight mb-2"
-                    style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 600 }}
+                    className="text-paper leading-tight mb-2"
+                    style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(20px, 6vw, 30px)' }}
                   >
                     {activeQuest.quest?.title}
                   </h2>
@@ -566,17 +563,21 @@ export default function Home() {
               See all →
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '0 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${layout.cols}, 1fr)`, gap: GRID_GAP, padding: `0 ${GRID_PADDING / 2}px` }}>
             {recentSessions.map(s => (
               <ScaledCard
                 key={s.id}
-                session={s}
-                cardUser={{
-                  name: profile?.name || user?.user_metadata?.full_name || 'You',
-                  avatar_url: profile?.avatar_url || null,
-                  avatar_color: profile?.avatar_color || '#c44829',
-                  streak: streak || 0,
+                session={{
+                  ...s,
+                  user: {
+                    name: profile?.name || user?.user_metadata?.full_name || 'You',
+                    avatar_url: profile?.avatar_url || null,
+                    avatar_color: profile?.avatar_color || '#c44829',
+                    streak: streak || 0,
+                  },
+                  reactions: [],
                 }}
+                targetWidth={layout.colW}
                 onClick={() => navigate(`/session/${s.id}`)}
               />
             ))}
