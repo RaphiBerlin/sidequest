@@ -9,7 +9,8 @@ import { useReactions } from '../hooks/useReactions'
 
 const SESSION_SELECT = 'id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, is_public, user:users(id, name, avatar_url, avatar_color, streak), quest:quests(title, description, xp, context_tags, duration_min), reactions(emoji, user_id)'
 const FEED_EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
-const CARD_WIDTH = 260
+const SOCIAL_STRIP_H = 52
+const ASPECT = 2.5 / 3.5
 
 function questForDay(sessions, daysAgo) {
   const target = new Date()
@@ -84,7 +85,7 @@ function ArcNav({ sessions, activeIndex, onSelect }) {
 
 // ── Social strip for active card ──────────────────────────────────────────────
 
-function ActiveSocialStrip({ session, currentUserId }) {
+function ActiveSocialStrip({ session, currentUserId, cardWidth }) {
   const { myReactions: mine, toggleReaction, grouped } = useReactions(session.id, currentUserId)
   const navigate = useNavigate()
   const isOwnCard = session.user?.id === currentUserId
@@ -93,7 +94,7 @@ function ActiveSocialStrip({ session, currentUserId }) {
     <div style={{
       background: '#f4ede0',
       borderRadius: '0 0 14px 14px',
-      width: CARD_WIDTH,
+      width: cardWidth,
       padding: '8px 12px 10px',
       display: 'flex',
       alignItems: 'center',
@@ -143,9 +144,26 @@ function ActiveSocialStrip({ session, currentUserId }) {
 // ── Swipeable card area ───────────────────────────────────────────────────────
 
 function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession, currentUserId, onSelect, navigate, total }) {
+  const containerRef = useRef(null)
+  const [cardWidth, setCardWidth] = useState(260)
   const touchStartY = useRef(null)
   const touchStartX = useRef(null)
   const isDragging = useRef(false)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    function measure() {
+      const h = containerRef.current.offsetHeight
+      // subtract: paddingBottom (80) + social strip (SOCIAL_STRIP_H) + breathing room (24)
+      const availH = h - 80 - SOCIAL_STRIP_H - 24
+      const w = Math.round(availH * ASPECT)
+      setCardWidth(Math.max(200, Math.min(w, 340)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
 
   function handleTouchStart(e) {
     touchStartY.current = e.touches[0].clientY
@@ -183,6 +201,7 @@ function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession
 
   return (
     <div
+      ref={containerRef}
       style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingBottom: 80 }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -190,7 +209,7 @@ function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession
       onWheel={handleWheel}
     >
       {loading ? (
-        <div style={{ width: 320, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ width: cardWidth, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
       ) : displayFeed.length === 0 ? (
         <div className="text-center px-8">
           {tab === 'friends' ? (
@@ -218,9 +237,9 @@ function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession
               style={{ animation: 'feedCardIn 0.2s ease-out', cursor: 'pointer' }}
               onClick={() => navigate(`/session/${activeSession?.id}`)}
             >
-              <QuestCard session={activeSession} width={CARD_WIDTH} />
+              <QuestCard session={activeSession} width={cardWidth} />
             </div>
-            {activeSession && <ActiveSocialStrip session={activeSession} currentUserId={currentUserId} />}
+            {activeSession && <ActiveSocialStrip session={activeSession} currentUserId={currentUserId} cardWidth={cardWidth} />}
           </div>
         </>
       )}
