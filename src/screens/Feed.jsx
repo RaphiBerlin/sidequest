@@ -9,6 +9,7 @@ import { useReactions } from '../hooks/useReactions'
 
 const SESSION_SELECT = 'id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, is_public, user:users(id, name, avatar_url, avatar_color, streak), quest:quests(title, description, xp, context_tags, duration_min), reactions(emoji, user_id)'
 const FEED_EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
+const CARD_WIDTH = 260
 
 function questForDay(sessions, daysAgo) {
   const target = new Date()
@@ -83,39 +84,37 @@ function ArcNav({ sessions, activeIndex, onSelect }) {
 
 // ── Social strip for active card ──────────────────────────────────────────────
 
-function ActiveSocialStrip({ session, currentUserId, onOpenDetail }) {
+function ActiveSocialStrip({ session, currentUserId }) {
   const { myReactions: mine, toggleReaction, grouped } = useReactions(session.id, currentUserId)
   const navigate = useNavigate()
-  const totalReactions = Object.values(grouped).reduce((a, b) => a + b, 0)
-  const commentCount = session.reactions?.length ?? 0 // placeholder until loaded
+  const isOwnCard = session.user?.id === currentUserId
 
   return (
     <div style={{
       background: '#f4ede0',
       borderRadius: '0 0 14px 14px',
-      width: 320,
+      width: CARD_WIDTH,
       padding: '8px 12px 10px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
     }}>
-      {/* User name */}
-      {session.user?.id && session.user.id !== currentUserId && (
-        <button
-          onClick={() => navigate(`/profile/${session.user.id}`)}
-          className="flex items-center gap-1.5 mb-2"
-        >
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: 'rgba(26,22,18,0.4)', letterSpacing: '0.04em' }}>
-            {session.user.name}
-          </span>
-          <span style={{ fontSize: 9, color: 'rgba(26,22,18,0.2)' }}>→</span>
+      {/* Avatar */}
+      {!isOwnCard && session.user?.id ? (
+        <button onClick={() => navigate(`/profile/${session.user.id}`)} style={{ flexShrink: 0, padding: 0 }}>
+          <Avatar src={session.user.avatar_url} name={session.user.name} color={session.user.avatar_color} size={32} />
         </button>
+      ) : (
+        <div style={{ width: 32, flexShrink: 0 }} />
       )}
 
-      {/* Reactions + comment */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Reactions + comment inline */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
         {FEED_EMOJIS.map(emoji => (
           <button
             key={emoji}
             onClick={() => toggleReaction(emoji)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all ${
+            className={`flex items-center gap-1 px-1.5 py-1 rounded-full text-xs transition-all ${
               mine.has(emoji)
                 ? 'bg-rust/15 border border-rust/40 scale-110'
                 : grouped[emoji] > 0
@@ -131,7 +130,8 @@ function ActiveSocialStrip({ session, currentUserId, onOpenDetail }) {
         ))}
         <button
           onClick={() => navigate(`/session/${session.id}`)}
-          className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-dark/10 text-dark/30 hover:border-dark/25 hover:bg-dark/5 transition-all"
+          className="flex items-center gap-1 px-1.5 py-1 rounded-full text-xs border border-dark/10 text-dark/30 hover:border-dark/25 hover:bg-dark/5 transition-all"
+          style={{ marginLeft: 'auto' }}
         >
           <span>💬</span>
         </button>
@@ -218,7 +218,7 @@ function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession
               style={{ animation: 'feedCardIn 0.2s ease-out', cursor: 'pointer' }}
               onClick={() => navigate(`/session/${activeSession?.id}`)}
             >
-              <QuestCard session={activeSession} />
+              <QuestCard session={activeSession} width={CARD_WIDTH} />
             </div>
             {activeSession && <ActiveSocialStrip session={activeSession} currentUserId={currentUserId} />}
           </div>
@@ -403,9 +403,8 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Tab toggle + filter on same row */}
-      <div className="relative flex items-center justify-center px-5 mb-3 flex-shrink-0">
-        {/* Tabs — truly centered */}
+      {/* Tab toggle */}
+      <div className="flex items-center justify-center px-5 mb-2 flex-shrink-0">
         <div className="flex gap-8">
           {[['public', 'Public'], ['friends', 'Friends']].map(([t, label]) => (
             <button
@@ -422,10 +421,11 @@ export default function Feed() {
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Filter dropdown — absolutely positioned to the right */}
-        {!loading && filterOptions.length > 1 && (
-          <div className="absolute right-5 top-0 bottom-0 flex items-center">
+      {/* Filter dropdown — own row */}
+      {!loading && filterOptions.length > 1 && (
+        <div className="flex justify-center px-5 mb-2 flex-shrink-0">
           <div className="relative">
             {dropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />}
             <button
@@ -444,7 +444,7 @@ export default function Feed() {
               </svg>
             </button>
             {dropdownOpen && (
-              <div className="absolute top-full mt-2 z-20 rounded-2xl overflow-hidden" style={{ right: 0, minWidth: 220, backgroundColor: '#2a2018', border: '1px solid rgba(244,237,224,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+              <div className="absolute top-full mt-2 z-20 rounded-2xl overflow-hidden" style={{ left: '50%', transform: 'translateX(-50%)', minWidth: 220, backgroundColor: '#2a2018', border: '1px solid rgba(244,237,224,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
                 {filterOptions.map((opt, i) => (
                   <button key={opt.key} onClick={() => { setFilter(opt.key); setDropdownOpen(false) }}
                     className="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -464,9 +464,8 @@ export default function Feed() {
               </div>
             )}
           </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main content */}
       <SwipeableCardArea
