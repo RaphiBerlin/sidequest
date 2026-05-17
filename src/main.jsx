@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useOnline } from './hooks/useOnline'
 import Login from './screens/Login'
 import AuthCallback from './screens/AuthCallback'
+import AuthConfirm from './screens/AuthConfirm'
 import JoinViaInvite from './screens/JoinViaInvite'
 import Onboarding from './screens/Onboarding'
 import Home from './screens/Home'
@@ -112,6 +113,7 @@ createRoot(document.getElementById('root')).render(
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/confirm" element={<AuthConfirm />} />
             <Route path="/join/:code" element={<JoinViaInvite />} />
             <Route
               path="/onboarding"
