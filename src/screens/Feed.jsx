@@ -9,83 +9,35 @@ import { useReactions } from '../hooks/useReactions'
 
 const SESSION_SELECT = 'id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, is_public, user:users(id, name, avatar_url, avatar_color, streak), quest:quests(title, description, xp, context_tags, duration_min), reactions(emoji, user_id)'
 const FEED_EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
-const SOCIAL_STRIP_H = 52
-const ASPECT = 2.5 / 3.5
+const CARD_WIDTH = Math.min(window.innerWidth - 32, 360)
 
-function questForDay(sessions, daysAgo) {
-  const target = new Date()
-  target.setDate(target.getDate() - daysAgo)
-  const targetDate = target.toDateString()
-  const daySessions = sessions.filter(s => new Date(s.completed_at).toDateString() === targetDate)
-  if (!daySessions.length) return null
-  const counts = {}
-  for (const s of daySessions) counts[s.quest_id] = (counts[s.quest_id] || 0) + 1
-  const questId = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0]
-  const title = daySessions.find(s => s.quest_id === questId)?.quest?.title ?? null
-  return { questId, title }
+function dayLabel(dateStr) {
+  const d = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-// ── Arc navigation ────────────────────────────────────────────────────────────
-
-function ArcNav({ sessions, activeIndex, onSelect }) {
-  const R = 185
-  const originX = -125
-  const step = 22
-
-  return (
-    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 70, pointerEvents: 'none', zIndex: 10 }}>
-      {sessions.map((session, idx) => {
-        const offset = idx - activeIndex
-        if (Math.abs(offset) > 4) return null
-        const theta = (offset * step * Math.PI) / 180
-        const x = originX + R * Math.cos(theta)
-        const y = R * Math.sin(theta)
-        const isActive = idx === activeIndex
-        const absOff = Math.abs(offset)
-        const size = isActive ? 50 : absOff === 1 ? 40 : absOff === 2 ? 32 : 24
-        const opacity = isActive ? 1 : absOff === 1 ? 0.55 : absOff === 2 ? 0.28 : 0.12
-
-        return (
-          <button
-            key={session.id}
-            onClick={() => onSelect(idx)}
-            style={{
-              position: 'absolute',
-              left: x,
-              top: `calc(50% + ${y}px)`,
-              transform: 'translate(-50%, -50%)',
-              width: size,
-              height: size,
-              borderRadius: '50%',
-              overflow: 'hidden',
-              opacity,
-              transition: 'all 0.35s cubic-bezier(0.34, 1.2, 0.64, 1)',
-              pointerEvents: 'auto',
-              border: isActive ? '2px solid #d4a02a' : '1.5px solid rgba(244,237,224,0.12)',
-              boxShadow: isActive ? '0 0 14px rgba(212,160,42,0.45)' : 'none',
-              background: '#2a2018',
-              flexShrink: 0,
-            }}
-          >
-            {session.photo_url ? (
-              <img
-                src={`${session.photo_url}?width=100&quality=60`}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            ) : (
-              <div style={{ width: '100%', height: '100%', background: 'rgba(244,237,224,0.06)' }} />
-            )}
-          </button>
-        )
-      })}
-    </div>
-  )
+function groupByDay(sessions) {
+  const groups = []
+  const map = {}
+  for (const s of sessions) {
+    const key = new Date(s.completed_at).toDateString()
+    if (!map[key]) {
+      map[key] = { label: dayLabel(s.completed_at), sessions: [] }
+      groups.push(map[key])
+    }
+    map[key].sessions.push(s)
+  }
+  return groups
 }
 
-// ── Social strip for active card ──────────────────────────────────────────────
+// ── Social strip ──────────────────────────────────────────────────────────────
 
-function ActiveSocialStrip({ session, currentUserId, cardWidth }) {
+function SocialStrip({ session, currentUserId }) {
   const { myReactions: mine, toggleReaction, grouped } = useReactions(session.id, currentUserId)
   const navigate = useNavigate()
   const isOwnCard = session.user?.id === currentUserId
@@ -94,13 +46,12 @@ function ActiveSocialStrip({ session, currentUserId, cardWidth }) {
     <div style={{
       background: '#f4ede0',
       borderRadius: '0 0 14px 14px',
-      width: cardWidth,
+      width: CARD_WIDTH,
       padding: '8px 12px 10px',
       display: 'flex',
       alignItems: 'center',
       gap: 8,
     }}>
-      {/* Avatar */}
       {!isOwnCard && session.user?.id ? (
         <button onClick={() => navigate(`/profile/${session.user.id}`)} style={{ flexShrink: 0, padding: 0 }}>
           <Avatar src={session.user.avatar_url} name={session.user.name} color={session.user.avatar_color} size={32} />
@@ -108,8 +59,6 @@ function ActiveSocialStrip({ session, currentUserId, cardWidth }) {
       ) : (
         <div style={{ width: 32, flexShrink: 0 }} />
       )}
-
-      {/* Reactions + comment inline */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
         {FEED_EMOJIS.map(emoji => (
           <button
@@ -141,132 +90,22 @@ function ActiveSocialStrip({ session, currentUserId, cardWidth }) {
   )
 }
 
-// ── Swipeable card area ───────────────────────────────────────────────────────
-
-function SwipeableCardArea({ displayFeed, loading, tab, safeIndex, activeSession, currentUserId, onSelect, navigate, total }) {
-  const containerRef = useRef(null)
-  const [cardWidth, setCardWidth] = useState(260)
-  const touchStartY = useRef(null)
-  const touchStartX = useRef(null)
-  const isDragging = useRef(false)
-
-  useEffect(() => {
-    if (!containerRef.current) return
-    function measure() {
-      const h = containerRef.current.offsetHeight
-      // subtract: paddingBottom (80) + social strip (SOCIAL_STRIP_H) + breathing room (24)
-      const availH = h - 80 - SOCIAL_STRIP_H - 24
-      const w = Math.round(availH * ASPECT)
-      setCardWidth(Math.max(200, Math.min(w, 340)))
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(containerRef.current)
-    return () => ro.disconnect()
-  }, [])
-
-  function handleTouchStart(e) {
-    touchStartY.current = e.touches[0].clientY
-    touchStartX.current = e.touches[0].clientX
-    isDragging.current = false
-  }
-
-  function handleTouchMove(e) {
-    if (touchStartY.current === null) return
-    const dy = e.touches[0].clientY - touchStartY.current
-    const dx = e.touches[0].clientX - touchStartX.current
-    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
-      isDragging.current = true
-      e.preventDefault()
-    }
-  }
-
-  function handleTouchEnd(e) {
-    if (touchStartY.current === null) return
-    const dy = e.changedTouches[0].clientY - touchStartY.current
-    if (isDragging.current && Math.abs(dy) > 40) {
-      if (dy < 0 && safeIndex < total - 1) onSelect(safeIndex + 1)
-      else if (dy > 0 && safeIndex > 0) onSelect(safeIndex - 1)
-    }
-    touchStartY.current = null
-    touchStartX.current = null
-    isDragging.current = false
-  }
-
-  function handleWheel(e) {
-    if (Math.abs(e.deltaY) < 10) return
-    if (e.deltaY > 0 && safeIndex < total - 1) onSelect(safeIndex + 1)
-    else if (e.deltaY < 0 && safeIndex > 0) onSelect(safeIndex - 1)
-  }
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingBottom: 80 }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onWheel={handleWheel}
-    >
-      {loading ? (
-        <div style={{ width: cardWidth, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      ) : displayFeed.length === 0 ? (
-        <div className="text-center px-8">
-          {tab === 'friends' ? (
-            <>
-              <p className="italic text-xl mb-3" style={{ fontFamily: "'Fraunces', serif", color: 'rgba(196,72,41,0.6)' }}>
-                Your friends haven't quested yet. You could be first.
-              </p>
-              <button onClick={() => navigate('/friends')} className="text-sm tracking-widest uppercase border px-6 py-2 rounded-lg" style={{ fontFamily: "'JetBrains Mono', monospace", borderColor: '#c44829', color: '#c44829' }}>
-                → Find friends
-              </button>
-            </>
-          ) : (
-            <p className="italic text-xl" style={{ fontFamily: "'Fraunces', serif", color: 'rgba(196,72,41,0.6)' }}>
-              Nothing public yet.
-            </p>
-          )}
-        </div>
-      ) : (
-        <>
-          <ArcNav sessions={displayFeed} activeIndex={safeIndex} onSelect={onSelect} />
-
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 5 }}>
-            <div
-              key={activeSession?.id}
-              style={{ animation: 'feedCardIn 0.2s ease-out', cursor: 'pointer' }}
-              onClick={() => navigate(`/session/${activeSession?.id}`)}
-            >
-              <QuestCard session={activeSession} width={cardWidth} />
-            </div>
-            {activeSession && <ActiveSocialStrip session={activeSession} currentUserId={currentUserId} cardWidth={cardWidth} />}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 // ── Main Feed ─────────────────────────────────────────────────────────────────
 
 export default function Feed() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { unreadCount } = useNotifications()
 
   const [profile, setProfile] = useState(null)
-  const { unreadCount } = useNotifications()
-  const [tab, setTab] = useState('public')
+  const [tab, setTab] = useState('friends')
   const [friendsFeed, setFriendsFeed] = useState([])
   const [publicFeed, setPublicFeed] = useState([])
   const [friendsLoading, setFriendsLoading] = useState(true)
   const [publicLoading, setPublicLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
 
   const friendIdsRef = useRef([])
   const channelRef = useRef(null)
-  const autoSetDoneRef = useRef(false)
 
   useEffect(() => {
     if (!user) return
@@ -276,17 +115,6 @@ export default function Feed() {
     fetchPublicFeed()
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [user])
-
-  useEffect(() => {
-    autoSetDoneRef.current = false
-    setFilter('all')
-    setDropdownOpen(false)
-    setActiveIndex(0)
-  }, [tab])
-
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [filter])
 
   async function fetchFriendsFeed() {
     try {
@@ -298,7 +126,7 @@ export default function Feed() {
       if (friendIds.length > 0) {
         const { data } = await supabase.from('quest_sessions').select(SESSION_SELECT)
           .in('user_id', friendIds).not('completed_at', 'is', null)
-          .order('completed_at', { ascending: false }).limit(20)
+          .order('completed_at', { ascending: false }).limit(30)
         setFriendsFeed(data || [])
       } else {
         setFriendsFeed([])
@@ -354,44 +182,11 @@ export default function Feed() {
 
   const feed = tab === 'friends' ? friendsFeed : publicFeed
   const loading = tab === 'friends' ? friendsLoading : publicLoading
-
-  const todayQuest = questForDay(feed, 0)
-  const yesterdayQuest = questForDay(feed, 1)
-
-  useEffect(() => {
-    if (loading || autoSetDoneRef.current) return
-    autoSetDoneRef.current = true
-    if (tab === 'public') {
-      if (todayQuest) setFilter('today')
-      else if (yesterdayQuest) setFilter('yesterday')
-    }
-  }, [loading, todayQuest, yesterdayQuest])
-
-  const filterOptions = [
-    { key: 'all', label: 'All quests', sub: null },
-    todayQuest ? { key: 'today', label: "Today's quest", sub: todayQuest.title } : null,
-    yesterdayQuest ? { key: 'yesterday', label: "Yesterday's quest", sub: yesterdayQuest.title } : null,
-  ].filter(Boolean)
-
-  const currentOption = filterOptions.find(f => f.key === filter) ?? filterOptions[0]
-
-  const displayFeed =
-    filter === 'today' && todayQuest ? feed.filter(s => s.quest_id === todayQuest.questId) :
-    filter === 'yesterday' && yesterdayQuest ? feed.filter(s => s.quest_id === yesterdayQuest.questId) :
-    feed
-
-  const safeIndex = Math.min(activeIndex, Math.max(0, displayFeed.length - 1))
-  const activeSession = displayFeed[safeIndex]
+  const groups = groupByDay(feed)
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0,
-        background: '#1a1612',
-        fontFamily: "'Bricolage Grotesque', sans-serif",
-        display: 'flex', flexDirection: 'column',
-      }}
-    >
+    <div style={{ position: 'fixed', inset: 0, background: '#1a1612', fontFamily: "'Bricolage Grotesque', sans-serif", display: 'flex', flexDirection: 'column' }}>
+
       {/* Header */}
       <div className="px-5 pt-12 pb-3 flex items-center justify-between flex-shrink-0">
         <h1 className="italic text-4xl" style={{ fontFamily: "'Fraunces', serif", color: '#f4ede0' }}>
@@ -422,10 +217,10 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Tab toggle */}
-      <div className="flex items-center justify-center px-5 mb-2 flex-shrink-0">
+      {/* Tabs */}
+      <div className="flex items-center justify-center px-5 mb-3 flex-shrink-0">
         <div className="flex gap-8">
-          {[['public', 'Public'], ['friends', 'Friends']].map(([t, label]) => (
+          {[['friends', 'Friends'], ['public', 'Discovery']].map(([t, label]) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -442,69 +237,63 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Filter dropdown — own row */}
-      {!loading && filterOptions.length > 1 && (
-        <div className="flex justify-center px-5 mb-2 flex-shrink-0">
-          <div className="relative">
-            {dropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />}
-            <button
-              onClick={() => setDropdownOpen(o => !o)}
-              className="relative z-20 flex items-center gap-2 px-3 py-1.5 rounded-full"
-              style={{
-                fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
-                border: filter !== 'all' ? '1px solid rgba(196,72,41,0.5)' : '1px solid rgba(244,237,224,0.18)',
-                backgroundColor: filter !== 'all' ? 'rgba(196,72,41,0.12)' : 'transparent',
-                color: filter !== 'all' ? '#c44829' : 'rgba(244,237,224,0.5)',
-              }}
-            >
-              <span className="tracking-widest uppercase">{currentOption?.label}</span>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ transition: 'transform 0.15s', transform: dropdownOpen ? 'rotate(180deg)' : 'none' }}>
-                <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            {dropdownOpen && (
-              <div className="absolute top-full mt-2 z-20 rounded-2xl overflow-hidden" style={{ left: '50%', transform: 'translateX(-50%)', minWidth: 220, backgroundColor: '#2a2018', border: '1px solid rgba(244,237,224,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-                {filterOptions.map((opt, i) => (
-                  <button key={opt.key} onClick={() => { setFilter(opt.key); setDropdownOpen(false) }}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left"
-                    style={{ borderTop: i > 0 ? '1px solid rgba(244,237,224,0.07)' : 'none' }}
-                  >
-                    <div className="min-w-0 pr-3">
-                      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: filter === opt.key ? '#c44829' : 'rgba(244,237,224,0.7)' }}>{opt.label}</p>
-                      {opt.sub && <p className="text-xs mt-0.5 truncate italic" style={{ fontFamily: "'Fraunces', serif", color: 'rgba(244,237,224,0.35)' }}>{opt.sub}</p>}
-                    </div>
-                    {filter === opt.key && (
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
-                        <path d="M2.5 7l3 3 6-6" stroke="#c44829" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
+      {/* Scrollable feed */}
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 40 }}>
+            <div style={{ width: CARD_WIDTH, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          </div>
+        ) : feed.length === 0 ? (
+          <div className="text-center px-8 pt-16">
+            {tab === 'friends' ? (
+              <>
+                <p className="italic text-xl mb-3" style={{ fontFamily: "'Fraunces', serif", color: 'rgba(196,72,41,0.6)' }}>
+                  Your friends haven't quested yet.
+                </p>
+                <button onClick={() => navigate('/friends')} className="text-sm tracking-widest uppercase border px-6 py-2 rounded-lg"
+                  style={{ fontFamily: "'JetBrains Mono', monospace", borderColor: '#c44829', color: '#c44829' }}>
+                  → Find friends
+                </button>
+              </>
+            ) : (
+              <p className="italic text-xl" style={{ fontFamily: "'Fraunces', serif", color: 'rgba(196,72,41,0.6)' }}>
+                Nothing public yet.
+              </p>
             )}
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={{ paddingBottom: 100 }}>
+            {groups.map((group, gi) => (
+              <div key={gi}>
+                {/* Date divider */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: gi === 0 ? '0 16px 20px' : '28px 16px 20px',
+                }}>
+                  <span style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase',
+                    color: group.label === 'Today' ? '#d4a02a' : 'rgba(244,237,224,0.35)',
+                  }}>
+                    {group.label}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: 'rgba(244,237,224,0.08)' }} />
+                </div>
 
-      {/* Main content */}
-      <SwipeableCardArea
-        displayFeed={displayFeed}
-        loading={loading}
-        tab={tab}
-        safeIndex={safeIndex}
-        activeSession={activeSession}
-        currentUserId={user?.id}
-        onSelect={setActiveIndex}
-        navigate={navigate}
-        total={displayFeed.length}
-      />
-
-      <style>{`
-        @keyframes feedCardIn {
-          from { opacity: 0; transform: scale(0.97); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
+                {/* Cards */}
+                {group.sessions.map(session => (
+                  <div key={session.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
+                    <div style={{ cursor: 'pointer' }} onClick={() => navigate(`/session/${session.id}`)}>
+                      <QuestCard session={session} width={CARD_WIDTH} />
+                    </div>
+                    <SocialStrip session={session} currentUserId={user?.id} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
