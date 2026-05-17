@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import Avatar from '../components/Avatar'
-import QuestCard from '../components/QuestCard'
+import QuestCard, { ScaledCard } from '../components/QuestCard'
 import { useNotifications } from '../context/NotificationsContext'
 import { useReactions } from '../hooks/useReactions'
 
@@ -250,7 +250,7 @@ export default function Feed() {
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 40 }}>
-            <div style={{ width: cardWidth, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ width: cardWidth, height: Math.round(cardWidth * (3.5 / 2.5)), borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
           </div>
         ) : feed.length === 0 ? (
           <div className="text-center px-8 pt-16">
@@ -292,9 +292,7 @@ export default function Feed() {
                 {/* Cards */}
                 {group.sessions.map(session => (
                   <div key={session.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
-                    <div style={{ cursor: 'pointer' }} onClick={() => navigate(`/session/${session.id}`)}>
-                      <QuestCard session={session} width={cardWidth} />
-                    </div>
+                    <ScaledCard session={session} targetWidth={cardWidth} onClick={() => navigate(`/session/${session.id}`)} />
                     <SocialStrip session={session} currentUserId={user?.id} cardWidth={cardWidth} />
                   </div>
                 ))}

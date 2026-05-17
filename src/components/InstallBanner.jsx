@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { TAB_BAR_HEIGHT } from '../lib/tokens'
 
 const DISMISSED_KEY = 'sidequest_install_banner_dismissed'
 
@@ -54,7 +55,7 @@ export default function InstallBanner() {
     <div
       style={{
         position: 'fixed',
-        bottom: '64px', // above tab bar
+        bottom: TAB_BAR_HEIGHT,
         left: 0,
         right: 0,
         zIndex: 1000,

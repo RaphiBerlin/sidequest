@@ -13,7 +13,7 @@ export default function TabBar() {
         <img
           src="/icons/icon-1024.png"
           alt="Home"
-          style={{ width: 60, height: 60, objectFit: 'contain', opacity: active ? 1 : 0.45, marginTop: -16, marginBottom: -16 }}
+          style={{ width: 44, height: 44, objectFit: 'contain', opacity: active ? 1 : 0.45, marginTop: -8, marginBottom: -8 }}
           draggable={false}
         />
       ),

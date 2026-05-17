@@ -6,8 +6,13 @@ import { useAppState } from '../context/AppState'
 import { usePartySync } from '../hooks/usePartySync'
 import { useToast } from '../context/ToastContext'
 
-// Height of the top/bottom HUD bars in the expanded camera overlay
-const HUD_HEIGHT = 110
+// HUD bar heights and PiP dimensions derived from viewport at load time
+const HUD_HEIGHT = Math.max(80, Math.round(window.innerHeight * 0.13))
+const CAMERA_BOX_H = Math.max(140, Math.round(window.innerHeight * 0.19))
+const PIP_W = Math.round(window.innerWidth * 0.23)
+const PIP_H = Math.round(PIP_W * (3.5 / 2.5))
+const PIP_TOP = Math.round(window.innerHeight * 0.10)
+const SHUTTER_PAD = Math.round(window.innerWidth * 0.10)
 
 // Darkened crop-guide bars that show the exact 2.5:3.5 capture boundary
 function CropGuide() {
@@ -560,8 +565,8 @@ export default function ActiveQuest() {
 
         {/* Quest title */}
         <h1
-          className="text-3xl leading-tight text-paper"
-          style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 600 }}
+          className="leading-tight text-paper"
+          style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontWeight: 600, fontSize: 'clamp(22px, 7vw, 30px)' }}
         >
           {title}
         </h1>
@@ -584,7 +589,7 @@ export default function ActiveQuest() {
           ref={cameraFrameRef}
           onClick={expandCamera}
           className="w-full rounded-2xl border border-paper/10 overflow-hidden relative flex flex-col items-center justify-center gap-3 focus:outline-none"
-          style={{ background: '#0d0b09', height: 160, visibility: cameraExpanded ? 'hidden' : 'visible' }}
+          style={{ background: '#0d0b09', height: CAMERA_BOX_H, visibility: cameraExpanded ? 'hidden' : 'visible' }}
           aria-label="Open camera"
         >
           {capturedPhoto ? (
@@ -654,7 +659,7 @@ export default function ActiveQuest() {
 
           {/* PiP video */}
           {!capturedPhoto && dualMode && (
-            <div style={{ position: 'absolute', top: 80, left: 12, width: 90, height: 126, border: '2px solid #fff', borderRadius: 8, overflow: 'hidden', zIndex: 20 }}>
+            <div style={{ position: 'absolute', top: PIP_TOP, left: 12, width: PIP_W, height: PIP_H, border: '2px solid #fff', borderRadius: 8, overflow: 'hidden', zIndex: 20 }}>
               <video ref={pipVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
             </div>
           )}
@@ -685,7 +690,7 @@ export default function ActiveQuest() {
           </div>
 
           {/* Shutter controls — bottom bar */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HUD_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 40, paddingRight: 40, paddingBottom: 'env(safe-area-inset-bottom, 0px)', zIndex: 40 }}>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HUD_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: SHUTTER_PAD, paddingRight: SHUTTER_PAD, paddingBottom: 'env(safe-area-inset-bottom, 0px)', zIndex: 40 }}>
             {/* Flip */}
             <button
               onClick={flipCamera}

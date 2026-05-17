@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCrewLobby } from '../context/CrewLobbyContext'
 import Avatar from './Avatar'
+import { TAB_BAR_HEIGHT } from '../lib/tokens'
 
 export default function CrewLobbyPill() {
   const { lobby, setLobby } = useCrewLobby()
@@ -57,7 +58,7 @@ export default function CrewLobbyPill() {
       onClick={() => navigate('/crew-waiting', { state: lobby })}
       style={{
         position: 'fixed',
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
+        bottom: `calc(env(safe-area-inset-bottom, 0px) + ${TAB_BAR_HEIGHT + 20}px)`,
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 49,

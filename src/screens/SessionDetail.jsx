@@ -4,7 +4,8 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { useReactions } from '../hooks/useReactions'
 import { checkText } from '../lib/moderation'
-import QuestCard from '../components/QuestCard'
+import QuestCard, { ScaledCard } from '../components/QuestCard'
+import { CARD_BASE_WIDTH, CARD_ASPECT } from '../lib/tokens'
 import Avatar from '../components/Avatar'
 
 const SESSION_SELECT = 'id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, is_public, user:users(id, name, avatar_url, avatar_color, streak), quest:quests(title, description, xp, context_tags, duration_min), reactions(emoji, user_id)'
@@ -149,8 +150,11 @@ export default function SessionDetail() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center pt-8">
-          <div style={{ width: 320, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.07)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div className="flex justify-center pt-8 px-5">
+          {(() => {
+            const w = Math.min(window.innerWidth - 40, CARD_BASE_WIDTH)
+            return <div style={{ width: w, height: Math.round(w * CARD_ASPECT), borderRadius: 14, background: 'rgba(244,237,224,0.07)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          })()}
         </div>
       ) : !s ? (
         <div className="text-center py-20" style={{ color: 'rgba(244,237,224,0.4)', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
@@ -176,7 +180,7 @@ export default function SessionDetail() {
 
           {/* Card */}
           <div className="flex justify-center px-5 mb-6">
-            <QuestCard session={s} />
+            <ScaledCard session={s} targetWidth={Math.min(window.innerWidth - 40, CARD_BASE_WIDTH)} />
           </div>
 
           {/* Meta strip */}
@@ -303,7 +307,7 @@ function Chip({ label, value, accent }) {
       borderRadius: 10,
       padding: '6px 12px',
     }}>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '0.1em', color: accent ? '#d4a02a' : 'rgba(244,237,224,0.35)', textTransform: 'uppercase', marginBottom: 2 }}>{label}</p>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.1em', color: accent ? '#d4a02a' : 'rgba(244,237,224,0.35)', textTransform: 'uppercase', marginBottom: 2 }}>{label}</p>
       <p style={{ fontFamily: "'Fraunces', serif", fontStyle: 'italic', fontSize: 16, color: accent ? '#d4a02a' : '#f4ede0' }}>{value}</p>
     </div>
   )
