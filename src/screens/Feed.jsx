@@ -9,7 +9,9 @@ import { useReactions } from '../hooks/useReactions'
 
 const SESSION_SELECT = 'id, quest_id, completed_at, photo_url, elapsed_sec, xp_earned, party_ids, is_public, user:users(id, name, avatar_url, avatar_color, streak), quest:quests(title, description, xp, context_tags, duration_min), reactions(emoji, user_id)'
 const FEED_EMOJIS = ['🔥', '✨', '😂', '🙌', '🥲']
-const CARD_WIDTH = Math.min(window.innerWidth - 32, 360)
+function getCardWidth() {
+  return Math.min(window.innerWidth - 32, 360)
+}
 
 function dayLabel(dateStr) {
   const d = new Date(dateStr)
@@ -37,7 +39,7 @@ function groupByDay(sessions) {
 
 // ── Social strip ──────────────────────────────────────────────────────────────
 
-function SocialStrip({ session, currentUserId }) {
+function SocialStrip({ session, currentUserId, cardWidth }) {
   const { myReactions: mine, toggleReaction, grouped } = useReactions(session.id, currentUserId)
   const navigate = useNavigate()
   const isOwnCard = session.user?.id === currentUserId
@@ -46,7 +48,7 @@ function SocialStrip({ session, currentUserId }) {
     <div style={{
       background: '#f4ede0',
       borderRadius: '0 0 14px 14px',
-      width: CARD_WIDTH,
+      width: cardWidth,
       padding: '8px 12px 10px',
       display: 'flex',
       alignItems: 'center',
@@ -97,6 +99,7 @@ export default function Feed() {
   const navigate = useNavigate()
   const { unreadCount } = useNotifications()
 
+  const [cardWidth, setCardWidth] = useState(getCardWidth)
   const [profile, setProfile] = useState(null)
   const [tab, setTab] = useState('friends')
   const [friendsFeed, setFriendsFeed] = useState([])
@@ -106,6 +109,12 @@ export default function Feed() {
 
   const friendIdsRef = useRef([])
   const channelRef = useRef(null)
+
+  useEffect(() => {
+    const onResize = () => setCardWidth(getCardWidth())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -241,7 +250,7 @@ export default function Feed() {
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 40 }}>
-            <div style={{ width: CARD_WIDTH, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ width: cardWidth, aspectRatio: '2.5/3.5', borderRadius: 14, background: 'rgba(244,237,224,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
           </div>
         ) : feed.length === 0 ? (
           <div className="text-center px-8 pt-16">
@@ -284,9 +293,9 @@ export default function Feed() {
                 {group.sessions.map(session => (
                   <div key={session.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
                     <div style={{ cursor: 'pointer' }} onClick={() => navigate(`/session/${session.id}`)}>
-                      <QuestCard session={session} width={CARD_WIDTH} />
+                      <QuestCard session={session} width={cardWidth} />
                     </div>
-                    <SocialStrip session={session} currentUserId={user?.id} />
+                    <SocialStrip session={session} currentUserId={user?.id} cardWidth={cardWidth} />
                   </div>
                 ))}
               </div>

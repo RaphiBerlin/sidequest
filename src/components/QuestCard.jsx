@@ -80,18 +80,15 @@ const CARD_STYLES = `
 
   .sq-outlined-title {
     color: #1a1612;
-    -webkit-text-stroke: 5px #ffffff;
     paint-order: stroke fill;
     text-shadow: 0 2px 0 rgba(0,0,0,0.22);
   }
   .sq-outlined-eyebrow {
     color: #c44829;
-    -webkit-text-stroke: 2.4px #ffffff;
     paint-order: stroke fill;
   }
   .sq-outlined-body {
     color: #1a1612;
-    -webkit-text-stroke: 2.8px #ffffff;
     paint-order: stroke fill;
   }
 `
@@ -113,6 +110,7 @@ const fmtDate = (iso) => {
 }
 
 export default function QuestCard({ session: s, width = 320 }) {
+  const sc = width / 320
   const ref = useRef(null)
   const [hover, setHover] = useState(false)
   const [press, setPress] = useState(false)
@@ -255,17 +253,18 @@ export default function QuestCard({ session: s, width = 320 }) {
           }}
         >
           {/* ── TOP: eyebrow + title ── */}
-          <div style={{ paddingTop: 14, paddingLeft: '5%', paddingRight: 12 }}>
+          <div style={{ paddingTop: Math.round(14 * sc), paddingLeft: '5%', paddingRight: Math.round(12 * sc) }}>
             <div
               className="sq-outlined-eyebrow"
               style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 11,
+                fontSize: Math.round(11 * sc),
                 fontWeight: 800,
                 letterSpacing: '0.26em',
                 textTransform: 'uppercase',
-                marginBottom: 5,
+                marginBottom: Math.round(5 * sc),
                 lineHeight: 1,
+                WebkitTextStroke: `${(2.4 * sc).toFixed(1)}px #ffffff`,
               }}
             >
               {partyLabel}
@@ -276,12 +275,13 @@ export default function QuestCard({ session: s, width = 320 }) {
                 fontFamily: "'Fraunces', serif",
                 fontStyle: 'italic',
                 fontWeight: 400,
-                fontSize: 30,
+                fontSize: Math.round(30 * sc),
                 lineHeight: 1.04,
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
+                WebkitTextStroke: `${(5 * sc).toFixed(1)}px #ffffff`,
               }}
             >
               {s.quest?.title || 'Quest'}
@@ -292,19 +292,20 @@ export default function QuestCard({ session: s, width = 320 }) {
           <div style={{ flex: 1 }} />
 
           {/* ── DESCRIPTION ── */}
-          <div style={{ padding: '0 14px 6px' }}>
+          <div style={{ padding: `0 ${Math.round(14 * sc)}px ${Math.round(6 * sc)}px` }}>
             <p
               className="sq-outlined-body"
               style={{
                 fontFamily: "'Bricolage Grotesque', sans-serif",
                 fontStyle: 'italic',
                 fontWeight: 500,
-                fontSize: 13,
+                fontSize: Math.round(13 * sc),
                 lineHeight: 1.35,
                 display: '-webkit-box',
                 WebkitLineClamp: 3,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
+                WebkitTextStroke: `${(2.8 * sc).toFixed(1)}px #ffffff`,
               }}
             >
               {s.quest?.description || ''}
@@ -318,10 +319,10 @@ export default function QuestCard({ session: s, width = 320 }) {
               backdropFilter: 'blur(2px)',
               WebkitBackdropFilter: 'blur(2px)',
               borderTop: `1px solid ${bandLineColor}`,
-              padding: '5px 10px',
+              padding: `${Math.round(5 * sc)}px ${Math.round(10 * sc)}px`,
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: Math.round(8 * sc),
             }}
           >
             <span
@@ -329,7 +330,7 @@ export default function QuestCard({ session: s, width = 320 }) {
                 fontFamily: "'Bricolage Grotesque', sans-serif",
                 fontStyle: 'italic',
                 fontWeight: 600,
-                fontSize: 10,
+                fontSize: Math.round(10 * sc),
                 color: 'rgba(244,237,224,0.9)',
                 lineHeight: 1.2,
                 flexShrink: 0,
@@ -343,13 +344,13 @@ export default function QuestCard({ session: s, width = 320 }) {
                 fontFamily: "'Fraunces', serif",
                 fontStyle: 'italic',
                 fontWeight: 400,
-                fontSize: 11,
+                fontSize: Math.round(11 * sc),
                 color: 'rgba(244,237,224,0.9)',
                 lineHeight: 1.2,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                maxWidth: 140,
+                maxWidth: Math.round(140 * sc),
               }}
             >
               {s.user?.name || ''}
